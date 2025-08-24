@@ -1,9 +1,22 @@
+import { ThemeProvider as StyledThemeProvider } from 'styled-components'
 import TodoForm from './components/TodoForm'
 import TodoList from './components/TodoList'
 import useTodos from './hooks/useTodos'
-import { GlobalStyle, Container, Title } from './styles/TodoStyles'
+import { ThemeProvider, useTheme } from './context/ThemeContext'
+import { SearchIcon } from './components/Icons'
+import { 
+  GlobalStyle, 
+  Container, 
+  Header, 
+  Title, 
+  SearchIndicator,
+  getTheme
+} from './styles/TodoStyles'
 
-function App() {
+const AppContent = () => {
+  const { isDark } = useTheme()
+  const theme = getTheme(isDark)
+  
   const {
     todos,
     allTodos,
@@ -16,17 +29,18 @@ function App() {
     extractTagsAndText,
     reconstructTextWithTags,
     formatTimestamp,
-    searchQuery,
     searchTodos,
     clearSearch,
     searchActive
   } = useTodos()
 
   return (
-    <>
+    <StyledThemeProvider theme={theme}>
       <GlobalStyle />
       <Container>
-        <Title>Todo List</Title>
+        <Header>
+          <Title>Todo List</Title>
+        </Header>
         <TodoForm 
           onAddTodo={addTodo} 
           onSearch={searchTodos}
@@ -34,17 +48,13 @@ function App() {
           searchActive={searchActive}
         />
         {searchActive && (
-          <div style={{
-            padding: '0.5rem 0',
-            color: '#6c757d',
-            fontSize: '0.875rem',
-            textAlign: 'center'
-          }}>
+          <SearchIndicator isEmpty={todos.length === 0}>
+            <SearchIcon />
             {todos.length === 0 ? 
-              'No todos found' : 
+              'No todos found for your search' : 
               `Showing ${todos.length} of ${allTodos.length} todos`
             }
-          </div>
+          </SearchIndicator>
         )}
         <TodoList 
           todos={todos}
@@ -60,7 +70,15 @@ function App() {
           searchActive={searchActive}
         />
       </Container>
-    </>
+    </StyledThemeProvider>
+  )
+}
+
+function App() {
+  return (
+    <ThemeProvider>
+      <AppContent />
+    </ThemeProvider>
   )
 }
 

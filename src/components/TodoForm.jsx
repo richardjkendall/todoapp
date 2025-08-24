@@ -1,13 +1,18 @@
 import { useState } from 'react'
-import { Form, FormRow, Textarea, Button } from '../styles/TodoStyles'
+import { Form, FormRow, InputContainer, Textarea, Button } from '../styles/TodoStyles'
+import InputHelper from './InputHelper'
+import { PlusIcon, SearchIcon } from './Icons'
 
 const TodoForm = ({ onAddTodo, onSearch, searchActive, onClearSearch }) => {
   const [inputValue, setInputValue] = useState('')
   const [isSearchMode, setIsSearchMode] = useState(false)
+  const [isFocused, setIsFocused] = useState(false)
+  const [showHelper, setShowHelper] = useState(false)
 
   const handleSubmit = (e) => {
     e.preventDefault()
     if (inputValue.trim()) {
+      setShowHelper(false)
       if (isSearchMode) {
         // Extract search term (remove the /)
         const searchTerm = inputValue.slice(1).trim()
@@ -22,6 +27,7 @@ const TodoForm = ({ onAddTodo, onSearch, searchActive, onClearSearch }) => {
   const handleKeyDown = (e) => {
     if (e.key === 'Enter' && e.ctrlKey) {
       e.preventDefault()
+      setShowHelper(false)
       handleSubmit(e)
     } else if (e.key === 'Escape') {
       if (isSearchMode) {
@@ -50,8 +56,13 @@ const TodoForm = ({ onAddTodo, onSearch, searchActive, onClearSearch }) => {
     if (newIsSearchMode && value.length > 1) {
       const searchTerm = value.slice(1).trim()
       onSearch(searchTerm)
+      setShowHelper(false) // Hide helper when search starts returning results
     } else if (!newIsSearchMode) {
       onClearSearch()
+      // Show helper again when not in search mode and focused
+      if (isFocused) {
+        setShowHelper(true)
+      }
     }
   }
 
@@ -66,15 +77,29 @@ const TodoForm = ({ onAddTodo, onSearch, searchActive, onClearSearch }) => {
   return (
     <Form onSubmit={handleSubmit}>
       <FormRow>
-        <Textarea
-          value={inputValue}
-          onChange={handleInputChange}
-          onKeyDown={handleKeyDown}
-          placeholder={isSearchMode ? "Search todos... Use #tags, !priority, completed:true/false (Ctrl+Enter)" : "Add todo or /search... Use #tags and !1-!5 for priority (Ctrl+Enter to submit)"}
-          rows={1}
-        />
+        <InputContainer>
+          <Textarea
+            value={inputValue}
+            onChange={handleInputChange}
+            onKeyDown={handleKeyDown}
+            onFocus={() => {
+              setIsFocused(true)
+              setShowHelper(true)
+            }}
+            onBlur={() => {
+              setIsFocused(false)
+              // Delay hiding to allow clicking on helper
+              setTimeout(() => setShowHelper(false), 150)
+            }}
+            placeholder={isSearchMode ? "Search todos... Type /search to search by text, #tag for tags, !1-!5 for priority, completed:true/false for status" : "Add a new todo... Use #tags and !1-!5 for priority, or type / to search"}
+            rows={1}
+          />
+          <InputHelper show={showHelper} isSearchMode={isSearchMode} />
+        </InputContainer>
       </FormRow>
-      <Button type="submit">{isSearchMode ? 'Search' : 'Add'}</Button>
+      <Button type="submit" title={isSearchMode ? 'Search' : 'Add Todo'}>
+        {isSearchMode ? <SearchIcon /> : <PlusIcon />}
+      </Button>
     </Form>
   )
 }

@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import Tag from './Tag'
+import { EditIcon, CheckIcon, UndoIcon, DeleteIcon, SaveIcon, CancelIcon } from './Icons'
 import { 
   TodoItem as StyledTodoItem, 
   TodoNumber,
@@ -203,22 +204,22 @@ const TodoItem = ({
         <ButtonGroup>
           {isEditing ? (
             <>
-              <EditButton onClick={saveEdit} title="Save">💾</EditButton>
-              <CancelButton onClick={cancelEdit} title="Cancel">❌</CancelButton>
+              <EditButton onClick={saveEdit} title="Save"><SaveIcon /></EditButton>
+              <CancelButton onClick={cancelEdit} title="Cancel"><CancelIcon /></CancelButton>
             </>
           ) : (
             <>
               {todo.completed ? (
-                <DeleteButton onClick={() => onDeleteTodo(todo.id)} title="Delete">🗑️</DeleteButton>
+                <DeleteButton onClick={() => onDeleteTodo(todo.id)} title="Delete"><DeleteIcon /></DeleteButton>
               ) : (
-                <EditButton onClick={startEdit} title="Edit">✏️</EditButton>
+                <EditButton onClick={startEdit} title="Edit"><EditIcon /></EditButton>
               )}
               <CompleteButton 
                 completed={todo.completed}
                 onClick={() => onToggleComplete(todo.id)}
                 title={todo.completed ? 'Mark as incomplete' : 'Mark as complete'}
               >
-                {todo.completed ? '↩️' : '✅'}
+                {todo.completed ? <UndoIcon /> : <CheckIcon />}
               </CompleteButton>
             </>
           )}
