@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { Form, FormRow, InputContainer, Textarea, Button } from '../styles/TodoStyles'
 import InputHelper from './InputHelper'
 import { PlusIcon, SearchIcon } from './Icons'
@@ -48,17 +48,19 @@ const TodoForm = ({ onAddTodo, onSearch, searchActive, onClearSearch }) => {
     const newIsSearchMode = value.startsWith('/')
     if (newIsSearchMode !== isSearchMode) {
       setIsSearchMode(newIsSearchMode)
-      if (!newIsSearchMode) {
-        onClearSearch()
-      }
     }
     
     // Live search if in search mode
-    if (newIsSearchMode && value.length > 1) {
-      const searchTerm = value.slice(1).trim()
-      onSearch(searchTerm)
-      setShowHelper(false) // Hide helper when search starts returning results
-    } else if (!newIsSearchMode) {
+    if (newIsSearchMode) {
+      if (value.length > 1) {
+        const searchTerm = value.slice(1).trim()
+        onSearch(searchTerm)
+        setShowHelper(false) // Hide helper when search starts returning results
+      } else {
+        // User just typed '/' - don't search yet, but don't clear either
+        setShowHelper(true)
+      }
+    } else {
       onClearSearch()
       // Show helper again when not in search mode and focused
       if (isFocused) {
@@ -88,7 +90,7 @@ const TodoForm = ({ onAddTodo, onSearch, searchActive, onClearSearch }) => {
               setIsFocused(true)
               setShowHelper(true)
             }}
-            onBlur={() => {
+            onBlur={(e) => {
               setIsFocused(false)
               // Delay hiding to allow clicking on helper
               setTimeout(() => setShowHelper(false), 150)

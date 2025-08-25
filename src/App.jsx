@@ -42,23 +42,26 @@ const AppContent = () => {
       <Container>
         <StickyHeader 
           actions={<ExportImport todos={allTodos} onImportTodos={importTodos} />}
+          forceSticky={searchActive}
         >
           <TodoForm 
+            key="todo-form"
             onAddTodo={addTodo} 
             onSearch={searchTodos}
             onClearSearch={clearSearch}
             searchActive={searchActive}
           />
-          {searchActive && (
-            <SearchIndicator isEmpty={todos.length === 0}>
-              <SearchIcon />
-              {todos.length === 0 ? 
-                'No todos found for your search' : 
-                `Showing ${todos.length} of ${allTodos.length} todos`
-              }
-            </SearchIndicator>
-          )}
         </StickyHeader>
+        
+        {searchActive && (
+          <SearchIndicator isEmpty={todos.length === 0}>
+            <SearchIcon />
+            {todos.length === 0 ? 
+              'No todos found for your search' : 
+              `Showing ${todos.length} of ${allTodos.length} todos`
+            }
+          </SearchIndicator>
+        )}
         
         <ContentArea>
           <TodoList 

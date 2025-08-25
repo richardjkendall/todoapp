@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import styled, { useTheme } from 'styled-components'
 import useScrollSpy from '../hooks/useScrollSpy'
 
@@ -49,6 +49,7 @@ const CompactHeader = styled.div`
   gap: ${props => props.theme.spacing.md};
   width: 100%;
   min-height: fit-content;
+  flex-wrap: wrap;
   
   ${props => !props.isSticky && `
     justify-content: space-between;
@@ -56,6 +57,7 @@ const CompactHeader = styled.div`
   
   ${props => props.isSticky && `
     gap: ${props.theme.spacing.lg};
+    flex-wrap: nowrap;
   `}
 `
 
@@ -67,6 +69,7 @@ const CompactTitle = styled.h1`
   margin: 0;
   transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
   flex-shrink: 0;
+  order: 1;
   
   ${props => !props.isSticky && `
     color: ${props.theme.colors.text.primary};
@@ -89,23 +92,28 @@ const FormContainer = styled.div`
   flex-direction: column;
   
   ${props => props.isSticky && `
-    transform: scale(0.98);
+    transform: scale(0.95);
+    order: 2;
+    align-self: center;
     
     button {
       color: white !important;
+      align-self: center;
+      height: 2.5rem;
+      padding: 0.5rem;
     }
     
-    input, textarea {
-      color: white !important;
-      
-      &::placeholder {
-        color: rgba(255, 255, 255, 0.7) !important;
-      }
+    textarea {
+      min-height: 40px;
+      transition: height 0.1s ease;
     }
   `}
   
   ${props => !props.isSticky && `
     transform: scale(1);
+    order: 3;
+    width: 100%;
+    flex-basis: 100%;
     margin-bottom: ${props.theme.spacing.xl};
     
     @media (min-width: 768px) {
@@ -120,14 +128,33 @@ const ActionsContainer = styled.div`
   align-items: center;
   
   ${props => props.isSticky && `
+    order: 3;
+    align-self: center;
     * {
       color: white !important;
     }
   `}
+  
+  ${props => !props.isSticky && `
+    order: 2;
+    align-self: center;
+  `}
 `
 
-const StickyHeader = ({ children, actions }) => {
+const StickyHeader = ({ children, actions, forceSticky = false }) => {
   const { isScrolled } = useScrollSpy(60)
+  const [hasBeenSticky, setHasBeenSticky] = useState(false)
+  
+  // Once sticky due to scroll, stay sticky if search is active
+  const shouldBeSticky = isScrolled || (hasBeenSticky && forceSticky)
+  
+  useEffect(() => {
+    if (isScrolled) {
+      setHasBeenSticky(true)
+    } else if (!forceSticky) {
+      setHasBeenSticky(false)
+    }
+  }, [isScrolled, forceSticky])
   const contentRef = useRef(null)
   const placeholderRef = useRef(null)
   const theme = useTheme()
@@ -135,41 +162,27 @@ const StickyHeader = ({ children, actions }) => {
   useEffect(() => {
     if (contentRef.current && placeholderRef.current) {
       const height = contentRef.current.offsetHeight
-      if (isScrolled) {
+      if (shouldBeSticky) {
         placeholderRef.current.style.height = `${height}px`
       } else {
         placeholderRef.current.style.height = '0px'
       }
     }
-  }, [isScrolled])
+  }, [shouldBeSticky])
 
   return (
     <StickyContainer>
       <StickyPlaceholder ref={placeholderRef} />
-      <StickyContent ref={contentRef} isSticky={isScrolled} theme={{...theme, isDark: theme.colors.background === '#1E1E1E'}}>
-        {isScrolled ? (
-          <CompactHeader isSticky={isScrolled}>
-            <CompactTitle isSticky={isScrolled}>Todo List</CompactTitle>
-            <FormContainer isSticky={isScrolled}>
-              {children}
-            </FormContainer>
-            <ActionsContainer isSticky={isScrolled}>
-              {actions}
-            </ActionsContainer>
-          </CompactHeader>
-        ) : (
-          <>
-            <CompactHeader isSticky={isScrolled}>
-              <CompactTitle isSticky={isScrolled}>Todo List</CompactTitle>
-              <ActionsContainer isSticky={isScrolled}>
-                {actions}
-              </ActionsContainer>
-            </CompactHeader>
-            <FormContainer isSticky={isScrolled}>
-              {children}
-            </FormContainer>
-          </>
-        )}
+      <StickyContent ref={contentRef} isSticky={shouldBeSticky} theme={{...theme, isDark: theme.colors.background === '#1E1E1E'}}>
+<CompactHeader isSticky={shouldBeSticky}>
+          <CompactTitle isSticky={shouldBeSticky}>Todo List</CompactTitle>
+          <ActionsContainer isSticky={shouldBeSticky}>
+            {actions}
+          </ActionsContainer>
+          <FormContainer isSticky={shouldBeSticky}>
+            {children}
+          </FormContainer>
+        </CompactHeader>
       </StickyContent>
     </StickyContainer>
   )
