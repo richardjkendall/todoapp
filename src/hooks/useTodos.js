@@ -213,6 +213,44 @@ const useTodos = () => {
     setTodos(todos.filter(todo => todo.id !== id))
   }
 
+  const importTodos = (importedTodos) => {
+    try {
+      // Validate imported todos
+      const validTodos = importedTodos.filter(todo => 
+        todo && 
+        typeof todo.text === 'string' && 
+        todo.text.trim().length > 0
+      ).map(todo => ({
+        ...todo,
+        id: todo.id || Date.now() + Math.random(),
+        tags: Array.isArray(todo.tags) ? todo.tags : [],
+        priority: typeof todo.priority === 'number' && todo.priority >= 1 && todo.priority <= 5 ? todo.priority : DEFAULT_PRIORITY,
+        completed: Boolean(todo.completed),
+        timestamp: todo.timestamp || Date.now(),
+        order: todo.order || 0
+      }))
+
+      if (validTodos.length === 0) {
+        throw new Error('No valid todos found in import data')
+      }
+
+      // Merge with existing todos, avoiding duplicates based on text and timestamp
+      const existingTexts = new Set(todos.map(todo => `${todo.text}-${todo.timestamp}`))
+      const newTodos = validTodos.filter(todo => 
+        !existingTexts.has(`${todo.text}-${todo.timestamp}`)
+      )
+
+      if (newTodos.length > 0) {
+        setTodos([...newTodos, ...todos])
+      }
+
+      return newTodos.length
+    } catch (error) {
+      console.error('Import failed:', error)
+      throw error
+    }
+  }
+
   // Get todos to display (filtered or all)
   const displayTodos = searchQuery ? filteredTodos : todos
 
@@ -231,7 +269,8 @@ const useTodos = () => {
     searchQuery,
     searchTodos: filterTodos,
     clearSearch,
-    searchActive: !!searchQuery
+    searchActive: !!searchQuery,
+    importTodos
   }
 }
 

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { Form, FormRow, InputContainer, Textarea, Button } from '../styles/TodoStyles'
 import InputHelper from './InputHelper'
 import { PlusIcon, SearchIcon } from './Icons'
@@ -8,6 +8,7 @@ const TodoForm = ({ onAddTodo, onSearch, searchActive, onClearSearch }) => {
   const [isSearchMode, setIsSearchMode] = useState(false)
   const [isFocused, setIsFocused] = useState(false)
   const [showHelper, setShowHelper] = useState(false)
+  const textareaRef = useRef(null)
 
   const handleSubmit = (e) => {
     e.preventDefault()
@@ -79,6 +80,7 @@ const TodoForm = ({ onAddTodo, onSearch, searchActive, onClearSearch }) => {
       <FormRow>
         <InputContainer>
           <Textarea
+            ref={textareaRef}
             value={inputValue}
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
@@ -94,7 +96,7 @@ const TodoForm = ({ onAddTodo, onSearch, searchActive, onClearSearch }) => {
             placeholder={isSearchMode ? "Search todos... Type /search to search by text, #tag for tags, !1-!5 for priority, completed:true/false for status" : "Add a new todo... Use #tags and !1-!5 for priority, or type / to search"}
             rows={1}
           />
-          <InputHelper show={showHelper} isSearchMode={isSearchMode} />
+          <InputHelper show={showHelper} isSearchMode={isSearchMode} inputRef={textareaRef} />
         </InputContainer>
       </FormRow>
       <Button type="submit" title={isSearchMode ? 'Search' : 'Add Todo'}>

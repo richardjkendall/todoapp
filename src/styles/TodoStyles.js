@@ -112,6 +112,7 @@ export const Container = styled.div`
   margin: 0 auto;
   padding: ${props => props.theme.spacing.md};
   font-family: ${props => props.theme.typography.fontFamily};
+  min-height: 100vh;
   
   @media (min-width: 768px) {
     padding: ${props => props.theme.spacing.xl};
@@ -119,6 +120,14 @@ export const Container = styled.div`
   
   @media (min-width: 1024px) {
     padding: ${props => props.theme.spacing['2xl']};
+  }
+`
+
+export const ContentArea = styled.div`
+  margin-top: ${props => props.theme.spacing.lg};
+  
+  @media (min-width: 768px) {
+    margin-top: ${props => props.theme.spacing.xl};
   }
 `
 
@@ -208,12 +217,10 @@ export const Form = styled.form`
   display: flex;
   flex-direction: column;
   gap: ${props => props.theme.spacing.md};
-  margin-bottom: ${props => props.theme.spacing.xl};
   
   @media (min-width: 768px) {
     flex-direction: row;
     gap: ${props => props.theme.spacing.lg};
-    margin-bottom: ${props => props.theme.spacing['2xl']};
   }
 `
 
