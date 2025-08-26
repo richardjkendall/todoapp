@@ -97,12 +97,16 @@ export const useOneDriveOperations = () => {
         const graphService = createGraphService()
         if (!graphService) throw new Error('Unable to create Graph service')
 
-        const todos = await graphService.readTodos()
+        const result = await graphService.readTodos()
+        
+        // Handle new return format with metadata
+        const todos = result.todos || result || []
+        const lastModified = result.lastModified || null
         
         // Update tracking data
         lastSavedDataRef.current = todos
         
-        return todos || []
+        return { todos, lastModified }
       } catch (err) {
         logError(err, 'load')
         

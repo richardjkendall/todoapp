@@ -21,6 +21,8 @@ const useTodos = () => {
   const onUserChange = useCallback(() => {
     console.log('User made changes - will sync to OneDrive')
     setHasUserMadeChanges(true)
+    // Track when local data was last modified
+    localStorage.setItem('lastLocalModified', Date.now().toString())
   }, [])
   
   // Initialize focused sub-hooks
@@ -105,7 +107,9 @@ const useTodos = () => {
     try {
       // Load from OneDrive to check for any existing data
       console.log('Loading from OneDrive...')
-      const oneDriveTodos = await loadFromOneDrive()
+      const oneDriveResult = await loadFromOneDrive()
+      const oneDriveTodos = oneDriveResult?.todos || oneDriveResult || []
+      const oneDriveLastModified = oneDriveResult?.lastModified || null
       const currentLocalTodos = todos // Use current todos state, not loadTodos()
       
       console.log('OneDrive todos:', oneDriveTodos?.length || 0, 'Local todos:', currentLocalTodos?.length || 0)
@@ -127,9 +131,15 @@ const useTodos = () => {
             // Both have data but they're different - trigger conflict resolution
             console.log('Conflict detected - both local and OneDrive have different data')
             // Set conflict info to trigger the modal
+            // Get last local modification time
+            const lastLocalModified = localStorage.getItem('lastLocalModified')
+            const localModified = lastLocalModified ? parseInt(lastLocalModified) : Date.now()
+            
             setLocalConflictInfo({
               local: currentLocalTodos,
               remote: oneDriveTodos,
+              localModified: localModified,
+              remoteModified: oneDriveLastModified || Date.now(), // Use actual OneDrive modification time
               timestamp: Date.now()
             })
             return
@@ -227,6 +237,11 @@ const useTodos = () => {
     const initialTodos = loadTodos()
     setTodos(initialTodos)
     setIsLoaded(true)
+    
+    // Initialize lastLocalModified if not already set and we have todos
+    if (initialTodos.length > 0 && !localStorage.getItem('lastLocalModified')) {
+      localStorage.setItem('lastLocalModified', Date.now().toString())
+    }
   }, [loadTodos])
 
   // Use ref to track previous todos to avoid unnecessary saves
