@@ -286,13 +286,16 @@ const useTodos = () => {
 
   return {
     // Core state
-    todos,
+    todos: search.isSearchActive ? search.filteredTodos : todos,
     allTodos: todos, // Alias for backward compatibility
     setTodos,
     isLoaded,
 
     // Search functionality
-    ...search,
+    searchTodos: search.setSearchQuery,
+    clearSearch: search.clearSearch,
+    searchActive: search.isSearchActive,
+    searchQuery: search.searchQuery,
 
     // CRUD operations
     ...operations,
