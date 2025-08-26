@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import styled from 'styled-components'
 import { useAuth } from '../context/AuthContext'
+import UserAvatar from './UserAvatar'
 
 const AuthButtonContainer = styled.div`
   display: flex;
@@ -54,7 +55,7 @@ const ErrorMessage = styled.div`
 `
 
 const AuthButtonComponent = () => {
-  const { isAuthenticated, user, isLoading, error, login, logout } = useAuth()
+  const { isAuthenticated, user, isLoading, error, login, logout, profilePhoto, isLoadingPhoto } = useAuth()
   const [actionLoading, setActionLoading] = useState(false)
 
   const handleLogin = async () => {
@@ -91,9 +92,14 @@ const AuthButtonComponent = () => {
     return (
       <AuthButtonContainer>
         <UserInfo>
-          <UserName>{user.name || 'User'}</UserName>
-          <UserEmail>{user.username}</UserEmail>
+          <UserName>{user.name || user.displayName || 'User'}</UserName>
+          <UserEmail>{user.username || user.userPrincipalName}</UserEmail>
         </UserInfo>
+        <UserAvatar 
+          user={user}
+          profilePhoto={profilePhoto}
+          isLoadingPhoto={isLoadingPhoto}
+        />
         <AuthButton 
           onClick={handleLogout}
           disabled={actionLoading}
