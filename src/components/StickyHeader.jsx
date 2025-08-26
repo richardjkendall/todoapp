@@ -7,7 +7,11 @@ const StickyContainer = styled.div`
 `
 
 const StickyContent = styled.div`
-  transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  transition: transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94), 
+              box-shadow 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+              border-bottom 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+              backdrop-filter 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+              background 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
   z-index: 100;
   
   ${props => props.isSticky && `
@@ -126,6 +130,7 @@ const ActionsContainer = styled.div`
   flex-shrink: 0;
   display: flex;
   align-items: center;
+  gap: ${props => props.theme.spacing.sm};
   
   ${props => props.isSticky && `
     order: 3;
