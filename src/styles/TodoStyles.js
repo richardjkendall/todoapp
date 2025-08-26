@@ -126,8 +126,14 @@ export const Container = styled.div`
 export const ContentArea = styled.div`
   margin-top: ${props => props.theme.spacing.lg};
   
+  /* Add conditional padding to prevent content from being obscured by sticky header */
+  padding-top: ${props => props.headerIsSticky ? '5px' : '0'};
+  transition: padding-top 0.3s ease;
+  
   @media (min-width: 768px) {
     margin-top: ${props => props.theme.spacing.xl};
+    /* Desktop sticky header is much shorter */
+    padding-top: ${props => props.headerIsSticky ? props.theme.spacing.lg : '0'};
   }
 `
 
@@ -370,6 +376,14 @@ export const Textarea = styled.textarea`
   line-height: ${props => props.theme.typography.lineHeight.tight};
   resize: none;
   min-height: 3rem;
+  
+  @media (max-width: 767px) {
+    min-height: 4.5rem; /* Taller on mobile to accommodate multi-line placeholder */
+  }
+  
+  @media (min-width: 768px) {
+    min-height: 3rem; /* Keep original height on desktop */
+  }
   overflow: hidden;
   background-color: ${props => props.theme.colors.card};
   color: ${props => props.theme.colors.text.primary};

@@ -110,7 +110,7 @@ const SyncStatusIndicator = ({
           status: 'synced',
           text: lastSyncTime 
             ? `Synced ${formatSyncTime(lastSyncTime)}`
-            : 'All changes synced',
+            : 'Synced',
           priority: 'low'
         }
       case 'error':

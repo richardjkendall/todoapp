@@ -20,6 +20,10 @@ const HelperContainer = styled.div`
   min-width: 300px;
   max-width: 500px;
   
+  @media (max-width: 767px) {
+    display: none; /* Hide helper on mobile to prevent interference with add button */
+  }
+  
   @media (max-width: 480px) {
     min-width: 280px;
     max-width: calc(100vw - 2rem);

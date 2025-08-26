@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { ThemeProvider as StyledThemeProvider } from 'styled-components'
 import TodoForm from './components/TodoForm'
 import TodoList from './components/TodoList'
@@ -22,6 +23,7 @@ import {
 const AppContent = () => {
   const { isDark } = useTheme()
   const theme = getTheme(isDark)
+  const [headerIsSticky, setHeaderIsSticky] = useState(false)
   
   const {
     todos,
@@ -67,6 +69,7 @@ const AppContent = () => {
             </>
           }
           forceSticky={searchActive}
+          onStickyChange={setHeaderIsSticky}
         >
           <TodoForm 
             key="todo-form"
@@ -87,7 +90,7 @@ const AppContent = () => {
           </SearchIndicator>
         )}
         
-        <ContentArea>
+        <ContentArea headerIsSticky={headerIsSticky}>
           <TodoList 
             todos={todos}
             allTodos={allTodos}
