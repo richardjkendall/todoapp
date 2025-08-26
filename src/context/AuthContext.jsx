@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect } from 'react'
+import { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import { msalInstance, graphScopes } from '../config/msalConfig'
 
 const AuthContext = createContext(null)
@@ -17,6 +17,9 @@ export const AuthProvider = ({ children }) => {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState(null)
   const [isInitialized, setIsInitialized] = useState(false)
+  const [profilePhoto, setProfilePhoto] = useState(null)
+  const [isLoadingPhoto, setIsLoadingPhoto] = useState(false)
+
 
   // Initialize MSAL and check authentication status on mount
   useEffect(() => {
@@ -41,6 +44,7 @@ export const AuthProvider = ({ children }) => {
         if (accounts.length > 0 && !userLoggedOut) {
           setIsAuthenticated(true)
           setUser(accounts[0])
+          // Profile photo will be fetched via useEffect when isAuthenticated/user changes
         }
       } catch (error) {
         console.error('Error initializing MSAL or checking auth status:', error)
@@ -52,6 +56,59 @@ export const AuthProvider = ({ children }) => {
 
     initializeAndCheck()
   }, [])
+
+  // Fetch profile photo when user becomes authenticated
+  useEffect(() => {
+    const fetchPhoto = async () => {
+      if (!isAuthenticated || !user || !isInitialized) {
+        console.log('Skipping photo fetch - not ready:', { isAuthenticated, user: !!user, isInitialized })
+        return
+      }
+
+      try {
+        console.log('Starting profile photo fetch...')
+        setIsLoadingPhoto(true)
+        
+        // Get access token
+        const silentRequest = {
+          scopes: ['User.Read'],
+          account: user,
+        }
+        const response = await msalInstance.acquireTokenSilent(silentRequest)
+        const token = response.accessToken
+        console.log('Got access token for photo fetch')
+        
+        // Fetch profile photo
+        const photoResponse = await fetch('https://graph.microsoft.com/v1.0/me/photo/$value', {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        })
+
+        console.log('Photo fetch response status:', photoResponse.status)
+
+        if (photoResponse.ok) {
+          console.log('Photo fetch successful, creating blob URL')
+          const blob = await photoResponse.blob()
+          const photoUrl = URL.createObjectURL(blob)
+          setProfilePhoto(photoUrl)
+          console.log('Profile photo set:', photoUrl)
+        } else if (photoResponse.status === 404) {
+          console.log('User has no profile photo (404)')
+          setProfilePhoto(null)
+        } else {
+          throw new Error(`Failed to fetch profile photo: ${photoResponse.status}`)
+        }
+      } catch (error) {
+        console.error('Error fetching profile photo:', error)
+        setProfilePhoto(null)
+      } finally {
+        setIsLoadingPhoto(false)
+      }
+    }
+
+    fetchPhoto()
+  }, [isAuthenticated, user, isInitialized])
 
   const login = async () => {
     if (!isInitialized) {
@@ -75,6 +132,9 @@ export const AuthProvider = ({ children }) => {
         
         setIsAuthenticated(true)
         setUser(response.account)
+        
+        // Profile photo will be fetched via useEffect when isAuthenticated/user changes
+        
         return response
       }
     } catch (error) {
@@ -105,6 +165,12 @@ export const AuthProvider = ({ children }) => {
       // Clear local authentication state
       setIsAuthenticated(false)
       setUser(null)
+      
+      // Clear profile photo and revoke object URL to prevent memory leaks
+      if (profilePhoto) {
+        URL.revokeObjectURL(profilePhoto)
+      }
+      setProfilePhoto(null)
     } catch (error) {
       console.error('Logout error:', error)
       setError(error.message)
@@ -156,6 +222,8 @@ export const AuthProvider = ({ children }) => {
     isLoading,
     error,
     isInitialized,
+    profilePhoto,
+    isLoadingPhoto,
     login,
     logout,
     getAccessToken,

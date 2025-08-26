@@ -2,6 +2,7 @@ import { useState } from 'react'
 import styled from 'styled-components'
 import { useAuth } from '../context/AuthContext'
 import SyncStatusIndicator from './SyncStatusIndicator'
+import UserAvatar from './UserAvatar'
 import { SignInIcon, SignOutIcon } from './Icons'
 
 const StatusContainer = styled.div`
@@ -56,7 +57,7 @@ const SyncStatus = ({
   queueStatus,
   conflictInfo
 }) => {
-  const { isAuthenticated, login, logout } = useAuth()
+  const { isAuthenticated, user, login, logout, profilePhoto, isLoadingPhoto } = useAuth()
 
   const handleAuthToggle = async () => {
     try {
@@ -80,6 +81,12 @@ const SyncStatus = ({
             queueStatus={queueStatus}
             conflictInfo={conflictInfo}
             isOneDriveMode={true}
+          />
+          
+          <UserAvatar 
+            user={user}
+            profilePhoto={profilePhoto}
+            isLoadingPhoto={isLoadingPhoto}
           />
           
           <AuthButton onClick={handleAuthToggle}>
