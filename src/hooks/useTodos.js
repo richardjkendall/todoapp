@@ -1,443 +1,319 @@
-import { useState, useEffect } from 'react'
-import { DEFAULT_PRIORITY } from '../utils/priority'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useEnhancedOneDriveStorage } from './useEnhancedOneDriveStorage'
 import { useDataIntegrity } from './useDataIntegrity'
 import { useAuth } from '../context/AuthContext'
+import { useTodoOperations } from './useTodoOperations'
+import { useTodoSearch } from './useTodoSearch'
+import { useTodoTextParser } from './useTodoTextParser'
 
+/**
+ * Main todos hook - simplified by composing focused sub-hooks
+ */
 const useTodos = () => {
   const [todos, setTodos] = useState([])
   const [isLoaded, setIsLoaded] = useState(false)
-  const [searchQuery, setSearchQuery] = useState('')
-  const [filteredTodos, setFilteredTodos] = useState([])
   const [hasUserMadeChanges, setHasUserMadeChanges] = useState(false)
+  const [isSyncing, setIsSyncing] = useState(false)
   
-  // Enhanced OneDrive integration
   const { isAuthenticated } = useAuth()
-  const {
-    isOneDriveMode,
-    storageType,
-    syncStatus,
-    loadFromOneDrive,
-    saveToOneDrive,
-    conflictInfo,
-    resolveConflict,
-    rollbackOptimisticChanges,
-    isOnline,
-    queueStatus,
-    migrateToOneDrive,
-    switchStorageType,
-    STORAGE_TYPES
-  } = useEnhancedOneDriveStorage()
-
-  // Data integrity monitoring
-  const { syncHealthScore, validateTodos, cleanupTodos } = useDataIntegrity(todos, isOneDriveMode)
-
-  // Utility functions
-  const extractTagsAndText = (text) => {
-    const tagRegex = /#\w+/g
-    const priorityRegex = /!([1-5])/g
-    
-    const tags = (text.match(tagRegex) || []).map(tag => tag.substring(1))
-    
-    // Extract priority (take the last one if multiple)
-    const priorityMatches = text.match(priorityRegex)
-    const priority = priorityMatches ? parseInt(priorityMatches[priorityMatches.length - 1].substring(1)) : DEFAULT_PRIORITY
-    
-    // Remove tags and priority from text
-    const cleanText = text.replace(tagRegex, '').replace(priorityRegex, '').trim().replace(/\s+/g, ' ')
-    
-    return { text: cleanText, tags, priority }
-  }
-
-  const reconstructTextWithTags = (text, tags, priority) => {
-    const tagString = tags.length > 0 ? ' ' + tags.map(tag => `#${tag}`).join(' ') : ''
-    const priorityString = priority && priority !== DEFAULT_PRIORITY ? ` !${priority}` : ''
-    return text + tagString + priorityString
-  }
-
-  const formatTimestamp = (timestamp) => {
-    const date = new Date(timestamp)
-    return date.toLocaleString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true
-    })
-  }
-
-  // Search and filter functionality
-  const parseSearchQuery = (query) => {
-    const terms = {
-      text: [],
-      tags: [],
-      priorities: [],
-      completed: null
-    }
-
-    const parts = query.split(/\s+/)
-    
-    parts.forEach(part => {
-      if (part.startsWith('#')) {
-        terms.tags.push(part.substring(1).toLowerCase())
-      } else if (part.startsWith('!') && /^!\d$/.test(part)) {
-        terms.priorities.push(parseInt(part.substring(1)))
-      } else if (part.startsWith('completed:')) {
-        const value = part.split(':')[1]
-        terms.completed = value === 'true'
-      } else if (part.trim()) {
-        terms.text.push(part.toLowerCase())
-      }
-    })
-
-    return terms
-  }
-
-  const filterTodos = (query) => {
-    if (!query.trim()) {
-      setFilteredTodos([])
-      setSearchQuery('')
-      return
-    }
-
-    const terms = parseSearchQuery(query)
-    setSearchQuery(query)
-
-    const filtered = todos.filter(todo => {
-      // Text search
-      if (terms.text.length > 0) {
-        const todoText = todo.text.toLowerCase()
-        const hasAllTextTerms = terms.text.every(term => todoText.includes(term))
-        if (!hasAllTextTerms) return false
-      }
-
-      // Tag filter
-      if (terms.tags.length > 0) {
-        const todoTags = (todo.tags || []).map(tag => tag.toLowerCase())
-        const hasAllTags = terms.tags.every(tag => todoTags.includes(tag))
-        if (!hasAllTags) return false
-      }
-
-      // Priority filter
-      if (terms.priorities.length > 0) {
-        const todoPriority = todo.priority || DEFAULT_PRIORITY
-        if (!terms.priorities.includes(todoPriority)) return false
-      }
-
-      // Completed filter
-      if (terms.completed !== null) {
-        if (todo.completed !== terms.completed) return false
-      }
-
-      return true
-    })
-
-    setFilteredTodos(filtered)
-  }
-
-  const clearSearch = () => {
-    setSearchQuery('')
-    setFilteredTodos([])
-  }
-
-  // Always load from localStorage first for immediate display
-  useEffect(() => {
-    const loadTodos = () => {
-      try {
-        const savedTodos = localStorage.getItem('todos')
-        if (savedTodos) {
-          try {
-            const parsedTodos = JSON.parse(savedTodos)
-            // Basic cleanup of corrupted data during load
-            const cleanedTodos = parsedTodos.filter(todo => {
-              if (!todo || typeof todo !== 'object') return false
-              if (!todo.id || !todo.text || todo.text.trim() === '') return false
-              return true
-            }).map(todo => ({
-              ...todo,
-              id: todo.id || Date.now() + Math.random(),
-              text: typeof todo.text === 'string' ? todo.text.trim() : String(todo.text || ''),
-              completed: Boolean(todo.completed),
-              timestamp: todo.timestamp || Date.now(),
-              tags: Array.isArray(todo.tags) ? todo.tags : [],
-              priority: (typeof todo.priority === 'number' && todo.priority >= 1 && todo.priority <= 5) 
-                ? todo.priority : DEFAULT_PRIORITY,
-              order: typeof todo.order === 'number' ? todo.order : 0
-            }))
-            
-            setTodos(cleanedTodos)
-            
-            // If we cleaned up data, save the cleaned version
-            if (cleanedTodos.length !== parsedTodos.length) {
-              localStorage.setItem('todos', JSON.stringify(cleanedTodos))
-              console.log(`Cleaned up ${parsedTodos.length - cleanedTodos.length} corrupted todos`)
-            }
-          } catch (error) {
-            console.error('Error parsing todos from localStorage:', error)
-            setTodos([])
-          }
-        }
-      } catch (error) {
-        console.error('Error loading todos from localStorage:', error)
-        setTodos([])
-      } finally {
-        setIsLoaded(true)
-      }
-    }
-
-    loadTodos()
+  const { syncHealthScore, validateTodos, cleanupTodos } = useDataIntegrity(todos, true) // Always use OneDrive mode
+  
+  const onUserChange = useCallback(() => {
+    console.log('User made changes - will sync to OneDrive')
+    setHasUserMadeChanges(true)
   }, [])
+  
+  // Initialize focused sub-hooks
+  const operations = useTodoOperations(todos, setTodos, onUserChange)
+  const search = useTodoSearch(todos)
+  const textParser = useTodoTextParser()
+  
+  // OneDrive storage (always enabled since we simplified storage choice)
+  const oneDriveStorage = useEnhancedOneDriveStorage()
+  const {
+    saveToOneDrive,
+    loadFromOneDrive,
+    resolveConflict,
+    migrateToOneDrive,
+    rollbackOptimisticChanges,
+    syncStatus,
+    lastSyncTime,
+    isLoading,
+    error,
+    conflictInfo,
+    isOnline,
+    queueStatus
+  } = oneDriveStorage
 
-  // Always save to localStorage immediately, then sync to OneDrive in background if enabled
+  // Local conflict state to handle conflicts detected during comparison
+  const [localConflictInfo, setLocalConflictInfo] = useState(null)
+
+  // Log sync status changes for debugging
   useEffect(() => {
-    const saveTodos = async () => {
-      if (!isLoaded) return
+    console.log('Sync status changed to:', syncStatus)
+  }, [syncStatus])
 
-      try {
-        // Always save to localStorage first for immediate persistence
-        localStorage.setItem('todos', JSON.stringify(todos))
-        
-        // If OneDrive mode is enabled, sync in background
-        if (isOneDriveMode) {
-          // Only show toast for user-initiated changes, not initial sync
-          saveToOneDrive(todos, hasUserMadeChanges)
-        }
-      } catch (error) {
-        console.error('Error saving todos:', error)
-        
-        // If OneDrive sync fails, localStorage is still updated
-        // OneDrive will retry in background or show sync status
-      }
-    }
-
-    saveTodos()
-  }, [todos, isLoaded, isOneDriveMode, saveToOneDrive])
-
-  // Background sync: when first switching to OneDrive mode, check for conflicts
-  useEffect(() => {
-    const syncOnModeChange = async () => {
-      if (isOneDriveMode && isLoaded) {
-        try {
-          // Load from OneDrive to check for any existing data
-          const oneDriveTodos = await loadFromOneDrive()
-          
-          // If OneDrive has data, compare with localStorage
-          if (oneDriveTodos.length > 0) {
-            const localDataString = JSON.stringify(todos)
-            const oneDriveDataString = JSON.stringify(oneDriveTodos)
-            
-            if (localDataString !== oneDriveDataString) {
-              if (todos.length === 0) {
-                // localStorage is empty, use OneDrive data
-                console.log('OneDrive has data, updating localStorage...')
-                setTodos(oneDriveTodos)
-                localStorage.setItem('todos', JSON.stringify(oneDriveTodos))
-              }
-              // If both have data but different, let the normal conflict resolution handle it
-              // Don't force a sync here that would create unnecessary conflicts
-            }
-          } else if (todos.length > 0) {
-            // OneDrive is empty but localStorage has data - sync it once
-            console.log('Initial sync to OneDrive...')
-            saveToOneDrive(todos, false) // Don't show toast for initial sync
-          }
-        } catch (error) {
-          console.error('Background sync failed:', error)
-          // Continue with localStorage data, OneDrive sync will retry
-        }
-      }
-    }
-
-    // Only run when OneDrive mode changes, not on every todo change
-    const timeoutId = setTimeout(syncOnModeChange, 1000)
-    return () => clearTimeout(timeoutId)
-  }, [isOneDriveMode, isLoaded, loadFromOneDrive, saveToOneDrive]) // Removed todos dependency to prevent loops
-
-  // Todo operations
-  const addTodo = (inputText) => {
-    const { text, tags, priority } = extractTagsAndText(inputText)
-    const newTodo = {
-      id: Date.now(),
-      text,
-      tags,
-      completed: false,
-      timestamp: Date.now(),
-      priority,
-      order: 0 // New todos start at top of their priority group
-    }
-    setTodos([newTodo, ...todos])
-    setHasUserMadeChanges(true)
-  }
-
-  const toggleComplete = (id) => {
-    setTodos(todos.map(todo => 
-      todo.id === id ? { ...todo, completed: !todo.completed } : todo
-    ))
-    setHasUserMadeChanges(true)
-  }
-
-  const editTodo = (id, newText) => {
-    const { text, tags, priority } = extractTagsAndText(newText)
-    setTodos(todos.map(todo => 
-      todo.id === id ? { ...todo, text, tags, priority } : todo
-    ))
-    setHasUserMadeChanges(true)
-  }
-
-  const reorderTodos = (draggedId, newIndex, sortedTodos) => {
-    const draggedTodo = sortedTodos.find(todo => todo.id === draggedId)
-    const targetTodo = sortedTodos[newIndex]
-    
-    // Check if reorder is allowed (same priority)
-    if (!draggedTodo || !targetTodo || draggedTodo.priority !== targetTodo.priority) {
-      return false // Invalid reorder
-    }
-
-    // Create new order values for the priority group
-    const samePriorityTodos = sortedTodos.filter(todo => 
-      todo.priority === draggedTodo.priority && !todo.completed
-    )
-    
-    // Remove dragged todo and insert at new position
-    const filteredTodos = samePriorityTodos.filter(todo => todo.id !== draggedId)
-    const targetIndexInGroup = filteredTodos.findIndex(todo => todo.id === targetTodo.id)
-    const reorderedGroup = [
-      ...filteredTodos.slice(0, targetIndexInGroup),
-      draggedTodo,
-      ...filteredTodos.slice(targetIndexInGroup)
-    ]
-
-    // Update order values
-    const updatedTodos = todos.map(todo => {
-      const indexInGroup = reorderedGroup.findIndex(t => t.id === todo.id)
-      if (indexInGroup !== -1) {
-        return { ...todo, order: indexInGroup }
-      }
-      return todo
-    })
-
-    setTodos(updatedTodos)
-    setHasUserMadeChanges(true)
-    return true // Successful reorder
-  }
-
-  const removeTag = (todoId, tagToRemove) => {
-    setTodos(todos.map(todo => 
-      todo.id === todoId 
-        ? { ...todo, tags: todo.tags.filter(tag => tag !== tagToRemove) }
-        : todo
-    ))
-    setHasUserMadeChanges(true)
-  }
-
-  const deleteTodo = (id) => {
-    setTodos(todos.filter(todo => todo.id !== id))
-    setHasUserMadeChanges(true)
-  }
-
-  const importTodos = (importedTodos) => {
+  /**
+   * Load todos from storage
+   */
+  const loadTodos = useCallback(() => {
     try {
-      // Validate imported todos
-      const validTodos = importedTodos.filter(todo => 
-        todo && 
-        typeof todo.text === 'string' && 
-        todo.text.trim().length > 0
-      ).map(todo => ({
-        ...todo,
-        id: todo.id || Date.now() + Math.random(),
-        tags: Array.isArray(todo.tags) ? todo.tags : [],
-        priority: typeof todo.priority === 'number' && todo.priority >= 1 && todo.priority <= 5 ? todo.priority : DEFAULT_PRIORITY,
-        completed: Boolean(todo.completed),
-        timestamp: todo.timestamp || Date.now(),
-        order: todo.order || 0
-      }))
-
-      if (validTodos.length === 0) {
-        throw new Error('No valid todos found in import data')
+      const savedTodos = localStorage.getItem('todos')
+      if (savedTodos) {
+        const parsed = JSON.parse(savedTodos)
+        if (Array.isArray(parsed)) {
+          const cleaned = cleanupTodos(parsed)
+          setTodos(cleaned)
+          return cleaned
+        }
       }
-
-      // Merge with existing todos, avoiding duplicates based on text and timestamp
-      const existingTexts = new Set(todos.map(todo => `${todo.text}-${todo.timestamp}`))
-      const newTodos = validTodos.filter(todo => 
-        !existingTexts.has(`${todo.text}-${todo.timestamp}`)
-      )
-
-      if (newTodos.length > 0) {
-        setTodos([...newTodos, ...todos])
-        setHasUserMadeChanges(true)
-      }
-
-      return newTodos.length
+      return []
     } catch (error) {
-      console.error('Import failed:', error)
+      console.error('Failed to load todos from localStorage:', error)
+      return []
+    }
+  }, [cleanupTodos])
+
+  /**
+   * Save todos to localStorage and sync to OneDrive if needed
+   */
+  const saveTodos = useCallback(async (todosToSave, fromUserAction = false) => {
+    try {
+      localStorage.setItem('todos', JSON.stringify(todosToSave))
+      
+      // Only sync to OneDrive if this was a user action and we're authenticated
+      if (isAuthenticated && fromUserAction) {
+        console.log('Triggering OneDrive sync for user action. Current syncStatus:', syncStatus)
+        saveToOneDrive(todosToSave, true) // Show toast for user actions
+      } else {
+        console.log('Skipping OneDrive sync - isAuthenticated:', isAuthenticated, 'fromUserAction:', fromUserAction)
+      }
+    } catch (error) {
+      console.error('Failed to save todos:', error)
+    }
+  }, [isAuthenticated, saveToOneDrive])
+
+  /**
+   * Handle authentication changes and sync - with proper conflict detection
+   */
+  const syncOnModeChange = useCallback(async () => {
+    if (!isAuthenticated || !isLoaded) return
+
+    try {
+      // Load from OneDrive to check for any existing data
+      const oneDriveTodos = await loadFromOneDrive()
+      const currentLocalTodos = todos // Use current todos state, not loadTodos()
+      
+      if (oneDriveTodos && oneDriveTodos.length > 0) {
+        // OneDrive has data - compare with current local data
+        const localDataString = JSON.stringify(currentLocalTodos)
+        const oneDriveDataString = JSON.stringify(oneDriveTodos)
+        
+        if (localDataString !== oneDriveDataString) {
+          if (currentLocalTodos.length === 0) {
+            // Local is empty, use OneDrive data
+            console.log('Local empty, loading OneDrive data')
+            setIsSyncing(true)
+            setTodos(oneDriveTodos)
+            localStorage.setItem('todos', JSON.stringify(oneDriveTodos))
+            setIsSyncing(false)
+          } else {
+            // Both have data but they're different - trigger conflict resolution
+            console.log('Conflict detected - both local and OneDrive have different data')
+            // Set conflict info to trigger the modal
+            setLocalConflictInfo({
+              local: currentLocalTodos,
+              remote: oneDriveTodos,
+              timestamp: Date.now()
+            })
+            return
+          }
+        } else {
+          console.log('Local and OneDrive data are identical - no sync needed')
+        }
+      } else {
+        // OneDrive is empty, migrate local data if it exists
+        if (currentLocalTodos.length > 0) {
+          console.log('OneDrive empty, migrating local data')
+          setIsSyncing(true)
+          const migratedTodos = await migrateToOneDrive(currentLocalTodos)
+          if (migratedTodos && migratedTodos.length > 0) {
+            setTodos(migratedTodos)
+            localStorage.setItem('todos', JSON.stringify(migratedTodos))
+          }
+          setIsSyncing(false)
+        }
+      }
+    } catch (error) {
+      console.error('Sync on mode change failed:', error)
+      // Keep current local data on error
+    }
+  }, [isAuthenticated, isLoaded, todos, migrateToOneDrive, loadFromOneDrive])
+
+  /**
+   * Handle conflict resolution
+   */
+  const handleConflictResolution = useCallback(async (resolution, selectedTodos) => {
+    try {
+      // Handle local conflicts detected during comparison
+      if (localConflictInfo) {
+        let resolvedTodos = []
+        
+        switch (resolution) {
+          case 'local':
+          case 'use_local':
+            resolvedTodos = localConflictInfo.local
+            break
+          case 'remote':
+          case 'use_remote':
+            resolvedTodos = localConflictInfo.remote
+            break
+          case 'merge':
+            resolvedTodos = selectedTodos || []
+            break
+          default:
+            throw new Error(`Invalid conflict resolution option: ${resolution}`)
+        }
+        
+        // Update state and save to both localStorage and OneDrive
+        setIsSyncing(true)
+        setTodos(resolvedTodos)
+        localStorage.setItem('todos', JSON.stringify(resolvedTodos))
+        await saveToOneDrive(resolvedTodos, false) // Force sync the resolved data
+        setLocalConflictInfo(null) // Clear conflict
+        setIsSyncing(false)
+        
+        return resolvedTodos
+      }
+      
+      // Handle conflicts from OneDrive operations
+      if (resolveConflict) {
+        const resolvedTodos = await resolveConflict(resolution, selectedTodos)
+        if (resolvedTodos) {
+          setTodos(resolvedTodos)
+          localStorage.setItem('todos', JSON.stringify(resolvedTodos))
+          return resolvedTodos
+        }
+      }
+    } catch (error) {
+      console.error('Conflict resolution failed:', error)
       throw error
     }
-  }
+  }, [resolveConflict, localConflictInfo, saveToOneDrive])
 
-  // Enhanced migration function
-  const handleMigration = async (localTodos) => {
+  /**
+   * Enhanced migration function
+   */
+  const handleMigration = useCallback(async (localTodos) => {
     try {
       const migratedTodos = await migrateToOneDrive(localTodos)
       setTodos(migratedTodos)
-      // Update localStorage with migrated data
       localStorage.setItem('todos', JSON.stringify(migratedTodos))
       return migratedTodos
     } catch (error) {
       console.error('Migration failed:', error)
       throw error
     }
-  }
+  }, [migrateToOneDrive])
 
-  // Conflict resolution function
-  const handleConflictResolution = async (resolution, selectedTodos) => {
-    try {
-      const resolvedTodos = await resolveConflict(resolution, selectedTodos)
-      if (resolvedTodos) {
-        setTodos(resolvedTodos)
-        // Update localStorage immediately with resolved data
-        localStorage.setItem('todos', JSON.stringify(resolvedTodos))
-        return resolvedTodos
+  // Initial load
+  useEffect(() => {
+    const initialTodos = loadTodos()
+    setTodos(initialTodos)
+    setIsLoaded(true)
+  }, [loadTodos])
+
+  // Use ref to track previous todos to avoid unnecessary saves
+  const previousTodosRef = useRef(null)
+  const saveTodosRef = useRef(saveTodos)
+  saveTodosRef.current = saveTodos
+
+  // Auto-save when todos actually change (only to localStorage, not OneDrive)
+  useEffect(() => {
+    if (isLoaded && todos.length >= 0 && !isSyncing) {
+      // Only save if todos actually changed
+      const todosString = JSON.stringify(todos)
+      const previousTodosString = previousTodosRef.current
+      
+      if (previousTodosString !== todosString) {
+        console.log('Todos changed - auto-save triggered. hasUserMadeChanges:', hasUserMadeChanges, 'isSyncing:', isSyncing)
+        previousTodosRef.current = todosString
+        
+        // Capture current value of hasUserMadeChanges to avoid stale closure
+        const shouldSyncToOneDrive = hasUserMadeChanges
+        
+        const timeoutId = setTimeout(() => {
+          saveTodosRef.current(todos, shouldSyncToOneDrive)
+          if (shouldSyncToOneDrive) {
+            console.log('Resetting hasUserMadeChanges flag after save')
+            setHasUserMadeChanges(false) // Reset flag after sync
+          }
+        }, 500)
+        return () => clearTimeout(timeoutId)
+      } else {
+        console.log('Todos unchanged - skipping auto-save')
       }
-    } catch (error) {
-      console.error('Conflict resolution failed:', error)
-      throw error
+    } else if (isSyncing) {
+      console.log('Skipping auto-save - currently syncing')
     }
-  }
+  }, [todos, isLoaded, isSyncing])
 
-  // Get todos to display (filtered or all)
-  const displayTodos = searchQuery ? filteredTodos : todos
+  // Track previous authentication state to only sync when it changes
+  const prevAuthRef = useRef(isAuthenticated)
+  const syncOnModeChangeRef = useRef(syncOnModeChange)
+  syncOnModeChangeRef.current = syncOnModeChange
+
+  // Sync when authentication changes
+  useEffect(() => {
+    const prevAuth = prevAuthRef.current
+    prevAuthRef.current = isAuthenticated
+    
+    // Only sync if authentication state actually changed and we're now authenticated and loaded
+    if (isLoaded && isAuthenticated && prevAuth !== isAuthenticated) {
+      console.log('Authentication changed - triggering sync')
+      const timeoutId = setTimeout(syncOnModeChangeRef.current, 1000)
+      return () => clearTimeout(timeoutId)
+    } else {
+      console.log('Skipping sync - no auth change or not ready. isLoaded:', isLoaded, 'isAuth:', isAuthenticated, 'prevAuth:', prevAuth)
+    }
+  }, [isAuthenticated, isLoaded])
 
   return {
-    todos: displayTodos,
-    allTodos: todos,
-    addTodo,
-    toggleComplete,
-    editTodo,
-    removeTag,
-    deleteTodo,
-    reorderTodos,
-    extractTagsAndText,
-    reconstructTextWithTags,
-    formatTimestamp,
-    searchQuery,
-    searchTodos: filterTodos,
-    clearSearch,
-    searchActive: !!searchQuery,
-    importTodos,
-    handleMigration,
+    // Core state
+    todos,
+    allTodos: todos, // Alias for backward compatibility
+    setTodos,
+    isLoaded,
+
+    // Search functionality
+    ...search,
+
+    // CRUD operations
+    ...operations,
+
+    // Text parsing utilities
+    ...textParser,
+
+    // Storage and sync
+    saveTodos,
+    loadTodos,
     handleConflictResolution,
-    // Enhanced storage-related exports
-    storageType,
+    handleMigration,
+    rollbackOptimisticChanges,
+
+    // Sync status
     syncStatus,
-    isOneDriveMode,
-    conflictInfo,
+    lastSyncTime,
+    isLoading,
+    error,
+    conflictInfo: localConflictInfo || conflictInfo, // Use local conflict if present, otherwise OneDrive conflict
     isOnline,
     queueStatus,
-    switchStorageType,
-    // Data integrity exports
     syncHealthScore,
-    validateTodos
+
+    // Data integrity
+    validateTodos,
+    cleanupTodos
   }
 }
 
