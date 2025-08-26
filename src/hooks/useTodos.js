@@ -222,13 +222,25 @@ const useTodos = () => {
           // Load from OneDrive to check for any existing data
           const oneDriveTodos = await loadFromOneDrive()
           
-          // If OneDrive has data, the enhanced storage will handle conflict detection automatically
-          // If OneDrive is empty and we have localStorage data, it will sync automatically via the save effect
-          if (oneDriveTodos.length > 0 && todos.length === 0) {
-            // OneDrive has data but localStorage is empty - update localStorage
-            console.log('OneDrive has data, updating localStorage...')
-            setTodos(oneDriveTodos)
-            localStorage.setItem('todos', JSON.stringify(oneDriveTodos))
+          // If OneDrive has data, compare with localStorage
+          if (oneDriveTodos.length > 0) {
+            const localDataString = JSON.stringify(todos)
+            const oneDriveDataString = JSON.stringify(oneDriveTodos)
+            
+            if (localDataString !== oneDriveDataString) {
+              if (todos.length === 0) {
+                // localStorage is empty, use OneDrive data
+                console.log('OneDrive has data, updating localStorage...')
+                setTodos(oneDriveTodos)
+                localStorage.setItem('todos', JSON.stringify(oneDriveTodos))
+              }
+              // If both have data but different, let the normal conflict resolution handle it
+              // Don't force a sync here that would create unnecessary conflicts
+            }
+          } else if (todos.length > 0) {
+            // OneDrive is empty but localStorage has data - sync it once
+            console.log('Initial sync to OneDrive...')
+            saveToOneDrive(todos, false) // Don't show toast for initial sync
           }
         } catch (error) {
           console.error('Background sync failed:', error)
@@ -240,7 +252,7 @@ const useTodos = () => {
     // Only run when OneDrive mode changes, not on every todo change
     const timeoutId = setTimeout(syncOnModeChange, 1000)
     return () => clearTimeout(timeoutId)
-  }, [isOneDriveMode, isLoaded]) // Removed todos dependency to prevent loops
+  }, [isOneDriveMode, isLoaded, loadFromOneDrive, saveToOneDrive]) // Removed todos dependency to prevent loops
 
   // Todo operations
   const addTodo = (inputText) => {
