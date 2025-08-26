@@ -1,11 +1,16 @@
+import React from 'react'
 import { ThemeProvider as StyledThemeProvider } from 'styled-components'
 import TodoForm from './components/TodoForm'
 import TodoList from './components/TodoList'
 import useTodos from './hooks/useTodos'
 import { ThemeProvider, useTheme } from './context/ThemeContext'
+import { AuthProvider } from './context/AuthContext'
 import { SearchIcon } from './components/Icons'
 import ExportImport from './components/ExportImport'
 import StickyHeader from './components/StickyHeader'
+import AuthButton from './components/AuthButton'
+import StorageSettings from './components/StorageSettings'
+import ConflictResolution from './components/ConflictResolution'
 import { 
   GlobalStyle, 
   Container, 
@@ -33,7 +38,16 @@ const AppContent = () => {
     searchTodos,
     clearSearch,
     searchActive,
-    importTodos
+    importTodos,
+    handleMigration,
+    handleConflictResolution,
+    storageType,
+    syncStatus,
+    isOneDriveMode,
+    conflictInfo,
+    isOnline,
+    queueStatus,
+    switchStorageType
   } = useTodos()
 
   return (
@@ -41,7 +55,12 @@ const AppContent = () => {
       <GlobalStyle />
       <Container>
         <StickyHeader 
-          actions={<ExportImport todos={allTodos} onImportTodos={importTodos} />}
+          actions={
+            <>
+              <ExportImport todos={allTodos} onImportTodos={importTodos} />
+              <AuthButton />
+            </>
+          }
           forceSticky={searchActive}
         >
           <TodoForm 
@@ -63,6 +82,19 @@ const AppContent = () => {
           </SearchIndicator>
         )}
         
+        <StorageSettings 
+          todos={allTodos} 
+          onMigrate={handleMigration}
+          storageType={storageType}
+          syncStatus={syncStatus}
+          switchStorageType={switchStorageType}
+          isOneDriveMode={isOneDriveMode}
+          conflictInfo={conflictInfo}
+          isOnline={isOnline}
+          queueStatus={queueStatus}
+          STORAGE_TYPES={{ LOCAL: 'localStorage', ONEDRIVE: 'oneDrive' }}
+        />
+        
         <ContentArea>
           <TodoList 
             todos={todos}
@@ -79,15 +111,26 @@ const AppContent = () => {
           />
         </ContentArea>
       </Container>
+
+      {/* Conflict Resolution Modal */}
+      {conflictInfo && (
+        <ConflictResolution
+          conflictInfo={conflictInfo}
+          onResolve={handleConflictResolution}
+          isLoading={syncStatus === 'syncing'}
+        />
+      )}
     </StyledThemeProvider>
   )
 }
 
 function App() {
   return (
-    <ThemeProvider>
-      <AppContent />
-    </ThemeProvider>
+    <AuthProvider>
+      <ThemeProvider>
+        <AppContent />
+      </ThemeProvider>
+    </AuthProvider>
   )
 }
 

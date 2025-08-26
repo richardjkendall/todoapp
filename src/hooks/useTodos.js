@@ -1,11 +1,31 @@
 import { useState, useEffect } from 'react'
 import { DEFAULT_PRIORITY } from '../utils/priority'
+import { useEnhancedOneDriveStorage } from './useEnhancedOneDriveStorage'
+import { useAuth } from '../context/AuthContext'
 
 const useTodos = () => {
   const [todos, setTodos] = useState([])
   const [isLoaded, setIsLoaded] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [filteredTodos, setFilteredTodos] = useState([])
+  
+  // Enhanced OneDrive integration
+  const { isAuthenticated } = useAuth()
+  const {
+    isOneDriveMode,
+    storageType,
+    syncStatus,
+    loadFromOneDrive,
+    saveToOneDrive,
+    conflictInfo,
+    resolveConflict,
+    rollbackOptimisticChanges,
+    isOnline,
+    queueStatus,
+    migrateToOneDrive,
+    switchStorageType,
+    STORAGE_TYPES
+  } = useEnhancedOneDriveStorage()
 
   // Utility functions
   const extractTagsAndText = (text) => {
@@ -116,26 +136,82 @@ const useTodos = () => {
     setFilteredTodos([])
   }
 
-  // Load todos from localStorage on mount
+  // Always load from localStorage first for immediate display
   useEffect(() => {
-    const savedTodos = localStorage.getItem('todos')
-    if (savedTodos) {
+    const loadTodos = () => {
       try {
-        const parsedTodos = JSON.parse(savedTodos)
-        setTodos(parsedTodos)
+        const savedTodos = localStorage.getItem('todos')
+        if (savedTodos) {
+          try {
+            const parsedTodos = JSON.parse(savedTodos)
+            setTodos(parsedTodos)
+          } catch (error) {
+            console.error('Error parsing todos from localStorage:', error)
+            setTodos([])
+          }
+        }
       } catch (error) {
-        console.error('Error parsing todos from localStorage:', error)
+        console.error('Error loading todos from localStorage:', error)
+        setTodos([])
+      } finally {
+        setIsLoaded(true)
       }
     }
-    setIsLoaded(true)
+
+    loadTodos()
   }, [])
 
-  // Save todos to localStorage whenever todos change (but not on initial load)
+  // Always save to localStorage immediately, then sync to OneDrive in background if enabled
   useEffect(() => {
-    if (isLoaded) {
-      localStorage.setItem('todos', JSON.stringify(todos))
+    const saveTodos = async () => {
+      if (!isLoaded) return
+
+      try {
+        // Always save to localStorage first for immediate persistence
+        localStorage.setItem('todos', JSON.stringify(todos))
+        
+        // If OneDrive mode is enabled, sync in background
+        if (isOneDriveMode) {
+          saveToOneDrive(todos)
+        }
+      } catch (error) {
+        console.error('Error saving todos:', error)
+        
+        // If OneDrive sync fails, localStorage is still updated
+        // OneDrive will retry in background or show sync status
+      }
     }
-  }, [todos, isLoaded])
+
+    saveTodos()
+  }, [todos, isLoaded, isOneDriveMode, saveToOneDrive])
+
+  // Background sync: when first switching to OneDrive mode, check for conflicts
+  useEffect(() => {
+    const syncOnModeChange = async () => {
+      if (isOneDriveMode && isLoaded) {
+        try {
+          // Load from OneDrive to check for any existing data
+          const oneDriveTodos = await loadFromOneDrive()
+          
+          // If OneDrive has data, the enhanced storage will handle conflict detection automatically
+          // If OneDrive is empty and we have localStorage data, it will sync automatically via the save effect
+          if (oneDriveTodos.length > 0 && todos.length === 0) {
+            // OneDrive has data but localStorage is empty - update localStorage
+            console.log('OneDrive has data, updating localStorage...')
+            setTodos(oneDriveTodos)
+            localStorage.setItem('todos', JSON.stringify(oneDriveTodos))
+          }
+        } catch (error) {
+          console.error('Background sync failed:', error)
+          // Continue with localStorage data, OneDrive sync will retry
+        }
+      }
+    }
+
+    // Only run when OneDrive mode changes, not on every todo change
+    const timeoutId = setTimeout(syncOnModeChange, 1000)
+    return () => clearTimeout(timeoutId)
+  }, [isOneDriveMode, isLoaded]) // Removed todos dependency to prevent loops
 
   // Todo operations
   const addTodo = (inputText) => {
@@ -251,6 +327,36 @@ const useTodos = () => {
     }
   }
 
+  // Enhanced migration function
+  const handleMigration = async (localTodos) => {
+    try {
+      const migratedTodos = await migrateToOneDrive(localTodos)
+      setTodos(migratedTodos)
+      // Update localStorage with migrated data
+      localStorage.setItem('todos', JSON.stringify(migratedTodos))
+      return migratedTodos
+    } catch (error) {
+      console.error('Migration failed:', error)
+      throw error
+    }
+  }
+
+  // Conflict resolution function
+  const handleConflictResolution = async (resolution, selectedTodos) => {
+    try {
+      const resolvedTodos = await resolveConflict(resolution, selectedTodos)
+      if (resolvedTodos) {
+        setTodos(resolvedTodos)
+        // Update localStorage immediately with resolved data
+        localStorage.setItem('todos', JSON.stringify(resolvedTodos))
+        return resolvedTodos
+      }
+    } catch (error) {
+      console.error('Conflict resolution failed:', error)
+      throw error
+    }
+  }
+
   // Get todos to display (filtered or all)
   const displayTodos = searchQuery ? filteredTodos : todos
 
@@ -270,7 +376,17 @@ const useTodos = () => {
     searchTodos: filterTodos,
     clearSearch,
     searchActive: !!searchQuery,
-    importTodos
+    importTodos,
+    handleMigration,
+    handleConflictResolution,
+    // Enhanced storage-related exports
+    storageType,
+    syncStatus,
+    isOneDriveMode,
+    conflictInfo,
+    isOnline,
+    queueStatus,
+    switchStorageType
   }
 }
 
