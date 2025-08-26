@@ -58,7 +58,9 @@ export const useEnhancedOneDriveStorage = () => {
       clearTimeout(saveTimeoutRef.current)
     }
 
-    // Set new timeout
+    // Set new timeout with slightly randomized delay to reduce race conditions between tabs
+    const baseDelay = 1000
+    const randomDelay = Math.random() * 200 // Add 0-200ms randomization
     saveTimeoutRef.current = setTimeout(async () => {
       if (isOnline) {
         // Inline the immediate save logic to avoid circular dependency
@@ -131,7 +133,7 @@ export const useEnhancedOneDriveStorage = () => {
           data: todos
         })
       }
-    }, 1000) // 1 second debounce
+    }, baseDelay + randomDelay) // Randomized debounce to reduce race conditions
   }, [isOneDriveMode, isOnline, createGraphService, queueOperation, showSuccess, showError, showWarning])
 
   // Simple immediate save function (used by conflict resolution)
@@ -178,8 +180,14 @@ export const useEnhancedOneDriveStorage = () => {
     const hasChanged = !lastSavedDataRef.current || 
       JSON.stringify(todos) !== JSON.stringify(lastSavedDataRef.current)
     
-    // Trigger debounced save, only show toast if data changed and showToast is true
-    debouncedSave(todos, hasChanged && showToast)
+    // Don't sync if no changes detected
+    if (!hasChanged) {
+      console.log('No changes detected, skipping sync')
+      return
+    }
+    
+    // Trigger debounced save, only show toast if showToast is true
+    debouncedSave(todos, showToast)
   }, [isOneDriveMode, debouncedSave])
 
   // Load from OneDrive
