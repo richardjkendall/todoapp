@@ -1,11 +1,17 @@
+import React from 'react'
 import { ThemeProvider as StyledThemeProvider } from 'styled-components'
 import TodoForm from './components/TodoForm'
 import TodoList from './components/TodoList'
 import useTodos from './hooks/useTodos'
 import { ThemeProvider, useTheme } from './context/ThemeContext'
+import { AuthProvider } from './context/AuthContext'
+import { ToastProvider, ToastRenderer } from './context/ToastContext'
 import { SearchIcon } from './components/Icons'
 import ExportImport from './components/ExportImport'
 import StickyHeader from './components/StickyHeader'
+import SyncStatus from './components/SyncStatus'
+import ConflictResolution from './components/ConflictResolution'
+import OfflineIndicator from './components/OfflineIndicator'
 import { 
   GlobalStyle, 
   Container, 
@@ -33,15 +39,36 @@ const AppContent = () => {
     searchTodos,
     clearSearch,
     searchActive,
-    importTodos
+    importTodos,
+    handleConflictResolution,
+    syncStatus,
+    conflictInfo,
+    isOnline,
+    queueStatus,
+    syncHealthScore
   } = useTodos()
 
   return (
     <StyledThemeProvider theme={theme}>
       <GlobalStyle />
+      <OfflineIndicator 
+        isOnline={isOnline}
+        queueStatus={queueStatus}
+      />
       <Container>
         <StickyHeader 
-          actions={<ExportImport todos={allTodos} onImportTodos={importTodos} />}
+          actions={
+            <>
+              <SyncStatus 
+                syncStatus={syncStatus}
+                isOnline={isOnline}
+                queueStatus={queueStatus}
+                syncHealthScore={syncHealthScore}
+                conflictInfo={conflictInfo}
+              />
+              <ExportImport todos={allTodos} onImportTodos={importTodos} />
+            </>
+          }
           forceSticky={searchActive}
         >
           <TodoForm 
@@ -79,15 +106,30 @@ const AppContent = () => {
           />
         </ContentArea>
       </Container>
+
+      {/* Conflict Resolution Modal */}
+      {conflictInfo && (
+        <ConflictResolution
+          conflictInfo={conflictInfo}
+          onResolve={handleConflictResolution}
+          isLoading={syncStatus === 'syncing'}
+        />
+      )}
+      
+      <ToastRenderer />
     </StyledThemeProvider>
   )
 }
 
 function App() {
   return (
-    <ThemeProvider>
-      <AppContent />
-    </ThemeProvider>
+    <AuthProvider>
+      <ThemeProvider>
+        <ToastProvider>
+          <AppContent />
+        </ToastProvider>
+      </ThemeProvider>
+    </AuthProvider>
   )
 }
 
