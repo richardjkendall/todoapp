@@ -44,8 +44,7 @@ const AppContent = () => {
     syncStatus,
     conflictInfo,
     isOnline,
-    queueStatus,
-    syncHealthScore
+    queueStatus
   } = useTodos()
 
   return (
@@ -63,7 +62,6 @@ const AppContent = () => {
                 syncStatus={syncStatus}
                 isOnline={isOnline}
                 queueStatus={queueStatus}
-                syncHealthScore={syncHealthScore}
                 conflictInfo={conflictInfo}
               />
               <ExportImport todos={allTodos} onImportTodos={importTodos} />

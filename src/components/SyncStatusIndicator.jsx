@@ -26,6 +26,7 @@ const StatusContainer = styled.div`
     }
   }};
   transition: all 0.2s ease;
+  padding-right: ${props => props.theme.spacing.sm};
 `
 
 const StatusIcon = styled.div`
