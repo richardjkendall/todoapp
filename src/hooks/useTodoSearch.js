@@ -38,6 +38,10 @@ export const useTodoSearch = (todos) => {
         if (priority >= 1 && priority <= 5) {
           terms.priorities.push(priority)
         }
+      } else if (trimmed.startsWith('completed:')) {
+        // Completed status search with completed:true/false syntax
+        const value = trimmed.split(':')[1]
+        terms.completed = value === 'true'
       } else if (trimmed === 'completed' || trimmed === 'done') {
         // Completed status search
         terms.completed = true

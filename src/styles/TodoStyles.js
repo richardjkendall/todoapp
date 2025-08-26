@@ -387,7 +387,7 @@ export const Textarea = styled.textarea`
   }
   
   @media (min-width: 768px) {
-    padding: ${props => props.theme.spacing.lg} ${props => props.theme.spacing.md} ${props => props.theme.spacing.sm} ${props => props.theme.spacing.md};
+    padding: ${props => props.theme.spacing.md};
     font-size: ${props => props.theme.typography.fontSize.base};
   }
 `
