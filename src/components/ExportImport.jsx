@@ -7,6 +7,10 @@ const ExportImportContainer = styled.div`
   display: flex;
   gap: ${props => props.theme.spacing.sm};
   align-items: center;
+  
+  @media (max-width: 768px) {
+    display: none;
+  }
 `
 
 const ExportImportButton = styled.button`

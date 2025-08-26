@@ -83,15 +83,25 @@ const CompactHeader = styled.div`
   `}
   
   @media (max-width: 767px) {
-    flex-direction: column;
-    align-items: stretch;
-    gap: ${props => props.theme.spacing.sm};
+    /* Keep everything on one line for mobile header */
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: ${props => props.theme.spacing.xs};
+    flex-wrap: nowrap;
     
     ${props => props.isSticky && `
       gap: ${props => props.theme.spacing.xs};
       padding: ${props.theme.spacing.xs} 0;
-      align-items: stretch;
+      align-items: center;
       width: 100%;
+    `}
+    
+    /* Keep form on second line when not sticky */
+    ${props => !props.isSticky && `
+      flex-direction: column;
+      align-items: stretch;
+      gap: ${props.theme.spacing.sm};
     `}
   }
   
@@ -134,12 +144,19 @@ const CompactTitle = styled.h1`
   }
   
   @media (max-width: 767px) {
-    text-align: center;
     order: 1;
     font-size: ${props => props.theme.typography.fontSize.xl};
+    flex-shrink: 0;
     
     ${props => props.isSticky && `
       font-size: ${props.theme.typography.fontSize.lg};
+      text-align: left;
+    `}
+    
+    ${props => !props.isSticky && `
+      text-align: center;
+      width: 100%;
+      margin-bottom: ${props.theme.spacing.sm};
     `}
   }
   
@@ -194,23 +211,17 @@ const FormContainer = styled.div`
   `}
   
   @media (max-width: 767px) {
-    order: 3;
-    width: 100%;
-    
     ${props => props.isSticky && `
-      transform: scale(1);
-      margin: 0;
-      flex: 1;
-      
-      textarea {
-        width: 100%;
-        box-sizing: border-box;
-      }
-      
-      button {
-        width: 100%;
-        max-width: none;
-      }
+      /* When sticky, hide the form to save space */
+      display: none;
+    `}
+    
+    ${props => !props.isSticky && `
+      /* When not sticky, form takes full width on separate line */
+      order: 3;
+      width: 100%;
+      margin-top: ${props.theme.spacing.sm};
+      margin-bottom: 0;
     `}
   }
   
@@ -251,9 +262,20 @@ const ActionsContainer = styled.div`
   @media (max-width: 767px) {
     order: 2;
     align-self: center;
-    justify-content: center;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     gap: ${props => props.theme.spacing.xs};
+    
+    ${props => props.isSticky && `
+      /* When sticky, keep actions compact on the right */
+      justify-content: flex-end;
+      flex-shrink: 0;
+    `}
+    
+    ${props => !props.isSticky && `
+      /* When not sticky, center actions */
+      justify-content: center;
+      width: 100%;
+    `}
   }
   
   @media (min-width: 768px) and (max-width: 900px) {
@@ -264,7 +286,7 @@ const ActionsContainer = styled.div`
   }
 `
 
-const StickyHeader = ({ children, actions, forceSticky = false }) => {
+const StickyHeader = ({ children, actions, forceSticky = false, onStickyChange }) => {
   const { isScrolled } = useScrollSpy(60)
   const [hasBeenSticky, setHasBeenSticky] = useState(false)
   
@@ -278,6 +300,13 @@ const StickyHeader = ({ children, actions, forceSticky = false }) => {
       setHasBeenSticky(false)
     }
   }, [isScrolled, forceSticky])
+
+  // Notify parent of sticky state changes
+  useEffect(() => {
+    if (onStickyChange) {
+      onStickyChange(shouldBeSticky)
+    }
+  }, [shouldBeSticky, onStickyChange])
   
   const contentRef = useRef(null)
   const placeholderRef = useRef(null)
