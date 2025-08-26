@@ -57,28 +57,34 @@ class GraphService {
   // Read todos from OneDrive
   async readTodos() {
     try {
+      // First get file metadata to get lastModifiedDateTime
+      const metadata = await this.makeGraphRequest(`/me/drive/special/approot:/${TODO_FILE_NAME}`)
+      
+      // Then get file content
       const response = await this.makeGraphRequest(`/me/drive/special/approot:/${TODO_FILE_NAME}:/content`)
       
+      let todos = []
       if (response && typeof response === 'object') {
-        return response
-      }
-      
-      // If response is a string, try to parse as JSON
-      if (typeof response === 'string') {
+        todos = response
+      } else if (typeof response === 'string') {
         try {
-          return JSON.parse(response)
+          todos = JSON.parse(response)
         } catch (parseError) {
           console.error('Failed to parse todos JSON:', parseError)
-          return []
+          todos = []
         }
       }
       
-      return []
+      // Return both todos and metadata
+      return {
+        todos: todos || [],
+        lastModified: metadata?.lastModifiedDateTime ? new Date(metadata.lastModifiedDateTime).getTime() : Date.now()
+      }
     } catch (error) {
       if (error.message.includes('404')) {
         // File doesn't exist yet
         console.log('Todos file not found, returning empty array')
-        return []
+        return { todos: [], lastModified: null }
       }
       console.error('Error reading todos from OneDrive:', error)
       throw error

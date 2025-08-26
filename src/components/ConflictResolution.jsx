@@ -181,7 +181,7 @@ const ConflictResolution = ({ conflictInfo, onResolve, isLoading }) => {
 
   if (!conflictInfo) return null
 
-  const { local, remote, remoteModified } = conflictInfo
+  const { local, remote, localModified, remoteModified } = conflictInfo
 
   const handleResolve = () => {
     let selectedTodos
@@ -221,7 +221,7 @@ const ConflictResolution = ({ conflictInfo, onResolve, isLoading }) => {
           >
             <VersionTitle>Your Local Version</VersionTitle>
             <VersionInfo>
-              {local.length} todos • Modified just now
+              {local.length} todos • Modified {localModified ? new Date(localModified).toLocaleString() : 'recently'}
             </VersionInfo>
             <TodoList>
               {local.slice(0, 10).map((todo, index) => (
@@ -239,7 +239,7 @@ const ConflictResolution = ({ conflictInfo, onResolve, isLoading }) => {
           >
             <VersionTitle>OneDrive Version</VersionTitle>
             <VersionInfo>
-              {remote.length} todos • Modified {new Date(remoteModified).toLocaleString()}
+              {remote.length} todos • Modified {remoteModified ? new Date(remoteModified).toLocaleString() : 'recently'}
             </VersionInfo>
             <TodoList>
               {remote.slice(0, 10).map((todo, index) => (
