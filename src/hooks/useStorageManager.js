@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
 
 const STORAGE_TYPES = {
@@ -14,7 +14,7 @@ export const useStorageManager = () => {
   
   const [storageType, setStorageType] = useState(() => {
     const saved = localStorage.getItem('preferredStorageType')
-    return saved || STORAGE_TYPES.LOCAL
+    return saved || STORAGE_TYPES.ONEDRIVE // Default to OneDrive since we simplified the app
   })
 
   /**
@@ -29,6 +29,17 @@ export const useStorageManager = () => {
     setStorageType(type)
     localStorage.setItem('preferredStorageType', type)
     return true
+  }, [isAuthenticated])
+
+  /**
+   * Auto-switch to OneDrive when authenticated and no preference is saved
+   */
+  useEffect(() => {
+    if (isAuthenticated && !localStorage.getItem('preferredStorageType')) {
+      console.log('Auto-switching to OneDrive mode for authenticated user')
+      setStorageType(STORAGE_TYPES.ONEDRIVE)
+      localStorage.setItem('preferredStorageType', STORAGE_TYPES.ONEDRIVE)
+    }
   }, [isAuthenticated])
 
   /**

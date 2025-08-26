@@ -97,12 +97,18 @@ const useTodos = () => {
    * Handle authentication changes and sync - with proper conflict detection
    */
   const syncOnModeChange = useCallback(async () => {
-    if (!isAuthenticated || !isLoaded) return
+    if (!isAuthenticated || !isLoaded) {
+      console.log('Skipping sync - not ready:', { isAuthenticated, isLoaded })
+      return
+    }
 
     try {
       // Load from OneDrive to check for any existing data
+      console.log('Loading from OneDrive...')
       const oneDriveTodos = await loadFromOneDrive()
       const currentLocalTodos = todos // Use current todos state, not loadTodos()
+      
+      console.log('OneDrive todos:', oneDriveTodos?.length || 0, 'Local todos:', currentLocalTodos?.length || 0)
       
       if (oneDriveTodos && oneDriveTodos.length > 0) {
         // OneDrive has data - compare with current local data
