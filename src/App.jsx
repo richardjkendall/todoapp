@@ -5,12 +5,13 @@ import TodoList from './components/TodoList'
 import useTodos from './hooks/useTodos'
 import { ThemeProvider, useTheme } from './context/ThemeContext'
 import { AuthProvider } from './context/AuthContext'
+import { ToastProvider, ToastRenderer } from './context/ToastContext'
 import { SearchIcon } from './components/Icons'
 import ExportImport from './components/ExportImport'
 import StickyHeader from './components/StickyHeader'
-import AuthButton from './components/AuthButton'
-import StorageSettings from './components/StorageSettings'
+import SyncStatus from './components/SyncStatus'
 import ConflictResolution from './components/ConflictResolution'
+import OfflineIndicator from './components/OfflineIndicator'
 import { 
   GlobalStyle, 
   Container, 
@@ -39,26 +40,33 @@ const AppContent = () => {
     clearSearch,
     searchActive,
     importTodos,
-    handleMigration,
     handleConflictResolution,
-    storageType,
     syncStatus,
-    isOneDriveMode,
     conflictInfo,
     isOnline,
     queueStatus,
-    switchStorageType
+    syncHealthScore
   } = useTodos()
 
   return (
     <StyledThemeProvider theme={theme}>
       <GlobalStyle />
+      <OfflineIndicator 
+        isOnline={isOnline}
+        queueStatus={queueStatus}
+      />
       <Container>
         <StickyHeader 
           actions={
             <>
+              <SyncStatus 
+                syncStatus={syncStatus}
+                isOnline={isOnline}
+                queueStatus={queueStatus}
+                syncHealthScore={syncHealthScore}
+                conflictInfo={conflictInfo}
+              />
               <ExportImport todos={allTodos} onImportTodos={importTodos} />
-              <AuthButton />
             </>
           }
           forceSticky={searchActive}
@@ -81,19 +89,6 @@ const AppContent = () => {
             }
           </SearchIndicator>
         )}
-        
-        <StorageSettings 
-          todos={allTodos} 
-          onMigrate={handleMigration}
-          storageType={storageType}
-          syncStatus={syncStatus}
-          switchStorageType={switchStorageType}
-          isOneDriveMode={isOneDriveMode}
-          conflictInfo={conflictInfo}
-          isOnline={isOnline}
-          queueStatus={queueStatus}
-          STORAGE_TYPES={{ LOCAL: 'localStorage', ONEDRIVE: 'oneDrive' }}
-        />
         
         <ContentArea>
           <TodoList 
@@ -120,6 +115,8 @@ const AppContent = () => {
           isLoading={syncStatus === 'syncing'}
         />
       )}
+      
+      <ToastRenderer />
     </StyledThemeProvider>
   )
 }
@@ -128,7 +125,9 @@ function App() {
   return (
     <AuthProvider>
       <ThemeProvider>
-        <AppContent />
+        <ToastProvider>
+          <AppContent />
+        </ToastProvider>
       </ThemeProvider>
     </AuthProvider>
   )

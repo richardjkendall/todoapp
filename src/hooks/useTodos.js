@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { DEFAULT_PRIORITY } from '../utils/priority'
 import { useEnhancedOneDriveStorage } from './useEnhancedOneDriveStorage'
+import { useDataIntegrity } from './useDataIntegrity'
 import { useAuth } from '../context/AuthContext'
 
 const useTodos = () => {
@@ -8,6 +9,7 @@ const useTodos = () => {
   const [isLoaded, setIsLoaded] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [filteredTodos, setFilteredTodos] = useState([])
+  const [hasUserMadeChanges, setHasUserMadeChanges] = useState(false)
   
   // Enhanced OneDrive integration
   const { isAuthenticated } = useAuth()
@@ -26,6 +28,9 @@ const useTodos = () => {
     switchStorageType,
     STORAGE_TYPES
   } = useEnhancedOneDriveStorage()
+
+  // Data integrity monitoring
+  const { syncHealthScore, validateTodos, cleanupTodos } = useDataIntegrity(todos, isOneDriveMode)
 
   // Utility functions
   const extractTagsAndText = (text) => {
@@ -144,7 +149,30 @@ const useTodos = () => {
         if (savedTodos) {
           try {
             const parsedTodos = JSON.parse(savedTodos)
-            setTodos(parsedTodos)
+            // Basic cleanup of corrupted data during load
+            const cleanedTodos = parsedTodos.filter(todo => {
+              if (!todo || typeof todo !== 'object') return false
+              if (!todo.id || !todo.text || todo.text.trim() === '') return false
+              return true
+            }).map(todo => ({
+              ...todo,
+              id: todo.id || Date.now() + Math.random(),
+              text: typeof todo.text === 'string' ? todo.text.trim() : String(todo.text || ''),
+              completed: Boolean(todo.completed),
+              timestamp: todo.timestamp || Date.now(),
+              tags: Array.isArray(todo.tags) ? todo.tags : [],
+              priority: (typeof todo.priority === 'number' && todo.priority >= 1 && todo.priority <= 5) 
+                ? todo.priority : DEFAULT_PRIORITY,
+              order: typeof todo.order === 'number' ? todo.order : 0
+            }))
+            
+            setTodos(cleanedTodos)
+            
+            // If we cleaned up data, save the cleaned version
+            if (cleanedTodos.length !== parsedTodos.length) {
+              localStorage.setItem('todos', JSON.stringify(cleanedTodos))
+              console.log(`Cleaned up ${parsedTodos.length - cleanedTodos.length} corrupted todos`)
+            }
           } catch (error) {
             console.error('Error parsing todos from localStorage:', error)
             setTodos([])
@@ -172,7 +200,8 @@ const useTodos = () => {
         
         // If OneDrive mode is enabled, sync in background
         if (isOneDriveMode) {
-          saveToOneDrive(todos)
+          // Only show toast for user-initiated changes, not initial sync
+          saveToOneDrive(todos, hasUserMadeChanges)
         }
       } catch (error) {
         console.error('Error saving todos:', error)
@@ -226,12 +255,14 @@ const useTodos = () => {
       order: 0 // New todos start at top of their priority group
     }
     setTodos([newTodo, ...todos])
+    setHasUserMadeChanges(true)
   }
 
   const toggleComplete = (id) => {
     setTodos(todos.map(todo => 
       todo.id === id ? { ...todo, completed: !todo.completed } : todo
     ))
+    setHasUserMadeChanges(true)
   }
 
   const editTodo = (id, newText) => {
@@ -239,6 +270,7 @@ const useTodos = () => {
     setTodos(todos.map(todo => 
       todo.id === id ? { ...todo, text, tags, priority } : todo
     ))
+    setHasUserMadeChanges(true)
   }
 
   const reorderTodos = (draggedId, newIndex, sortedTodos) => {
@@ -274,6 +306,7 @@ const useTodos = () => {
     })
 
     setTodos(updatedTodos)
+    setHasUserMadeChanges(true)
     return true // Successful reorder
   }
 
@@ -283,10 +316,12 @@ const useTodos = () => {
         ? { ...todo, tags: todo.tags.filter(tag => tag !== tagToRemove) }
         : todo
     ))
+    setHasUserMadeChanges(true)
   }
 
   const deleteTodo = (id) => {
     setTodos(todos.filter(todo => todo.id !== id))
+    setHasUserMadeChanges(true)
   }
 
   const importTodos = (importedTodos) => {
@@ -318,6 +353,7 @@ const useTodos = () => {
 
       if (newTodos.length > 0) {
         setTodos([...newTodos, ...todos])
+        setHasUserMadeChanges(true)
       }
 
       return newTodos.length
@@ -386,7 +422,10 @@ const useTodos = () => {
     conflictInfo,
     isOnline,
     queueStatus,
-    switchStorageType
+    switchStorageType,
+    // Data integrity exports
+    syncHealthScore,
+    validateTodos
   }
 }
 

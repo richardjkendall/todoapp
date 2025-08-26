@@ -82,7 +82,8 @@ const SyncStatusIndicator = ({
     if (conflictInfo) {
       return {
         status: 'conflict',
-        text: 'Sync conflict - action required'
+        text: 'Sync conflict - action required',
+        priority: 'high'
       }
     }
 
@@ -91,7 +92,8 @@ const SyncStatusIndicator = ({
         status: 'offline',
         text: queueStatus.count > 0 
           ? `Offline - ${queueStatus.count} changes queued`
-          : 'Offline'
+          : 'Working offline',
+        priority: queueStatus.count > 0 ? 'medium' : 'low'
       }
     }
 
@@ -99,24 +101,28 @@ const SyncStatusIndicator = ({
       case 'syncing':
         return {
           status: 'syncing',
-          text: 'Syncing...'
+          text: 'Syncing to cloud...',
+          priority: 'medium'
         }
       case 'synced':
         return {
           status: 'synced',
           text: lastSyncTime 
             ? `Synced ${formatSyncTime(lastSyncTime)}`
-            : 'Synced'
+            : 'All changes synced',
+          priority: 'low'
         }
       case 'error':
         return {
           status: 'error',
-          text: 'Sync failed'
+          text: 'Sync failed - data saved locally',
+          priority: 'medium'
         }
       default:
         return {
           status: 'idle',
-          text: 'OneDrive'
+          text: 'Ready to sync',
+          priority: 'low'
         }
     }
   }

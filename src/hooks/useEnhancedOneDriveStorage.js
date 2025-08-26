@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect, useRef } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useOfflineDetection } from './useOfflineDetection'
 import { useSyncQueue } from './useSyncQueue'
+import { useToastContext } from '../context/ToastContext'
 import GraphService from '../services/graphService'
 
 const STORAGE_TYPES = {
@@ -18,6 +19,7 @@ export const useEnhancedOneDriveStorage = () => {
   const { isAuthenticated, getAccessToken, isInitialized } = useAuth()
   const { isOnline, wasOffline, acknowledgeOnlineStatus } = useOfflineDetection()
   const { queueOperation, processQueue, queueStatus, clearQueue } = useSyncQueue()
+  const { showSuccess, showError, showWarning, showInfo } = useToastContext()
   
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState(null)
@@ -26,7 +28,7 @@ export const useEnhancedOneDriveStorage = () => {
   const [conflictInfo, setConflictInfo] = useState(null)
   const [storageType, setStorageType] = useState(() => {
     const saved = localStorage.getItem('preferredStorageType')
-    return saved || STORAGE_TYPES.LOCAL
+    return saved || STORAGE_TYPES.ONEDRIVE
   })
 
   // Refs for optimistic updates
@@ -48,7 +50,7 @@ export const useEnhancedOneDriveStorage = () => {
   }, [isInitialized, isAuthenticated, getAccessToken])
 
   // Debounced save function
-  const debouncedSave = useCallback((todos) => {
+  const debouncedSave = useCallback((todos, showToast = false) => {
     if (!isOneDriveMode) return
 
     // Clear existing timeout
@@ -57,9 +59,71 @@ export const useEnhancedOneDriveStorage = () => {
     }
 
     // Set new timeout
-    saveTimeoutRef.current = setTimeout(() => {
+    saveTimeoutRef.current = setTimeout(async () => {
       if (isOnline) {
-        saveToOneDriveImmediate(todos)
+        // Inline the immediate save logic to avoid circular dependency
+        try {
+          setSyncStatus('syncing')
+          setError(null)
+
+          const graphService = createGraphService()
+          
+          // Check for conflicts before saving
+          const currentFileInfo = await graphService.getTodosFileInfo()
+          const lastSyncedTime = localStorage.getItem('lastOneDriveSyncTime')
+          
+          // Only check for conflicts if we have sync history and the file was modified significantly after our last sync
+          if (currentFileInfo && lastSyncedTime) {
+            const fileModified = new Date(currentFileInfo.lastModified).getTime()
+            const lastSync = new Date(lastSyncedTime).getTime()
+            const timeDifference = fileModified - lastSync
+            
+            // Only consider it a conflict if the file was modified more than 5 seconds after our last sync
+            // This prevents false conflicts from small timing differences
+            if (timeDifference > 5000) {
+              // Conflict detected - load remote data for comparison
+              const remoteTodos = await graphService.readTodos()
+              setConflictInfo({
+                local: todos,
+                remote: remoteTodos,
+                remoteModified: currentFileInfo.lastModified
+              })
+              
+              setSyncStatus('conflict')
+              showWarning('Sync conflict detected - please resolve')
+              return
+            }
+          }
+
+          await graphService.writeTodos(todos)
+          
+          // Update sync tracking
+          const now = new Date().toISOString()
+          localStorage.setItem('lastOneDriveSyncTime', now)
+          setLastSyncTime(new Date())
+          setSyncStatus('synced')
+          lastSavedDataRef.current = todos
+
+          // Show success toast only for meaningful syncs
+          if (showToast) {
+            showSuccess('Synced to OneDrive', 2000)
+          }
+        } catch (err) {
+          console.error('Error saving to OneDrive:', err)
+          setError(err.message)
+          setSyncStatus('error')
+          
+          // Queue for retry if it was a network error
+          if (err.message.includes('fetch') || err.message.includes('network')) {
+            queueOperation({
+              type: OPERATION_TYPES.SAVE_TODOS,
+              data: todos
+            })
+            showWarning('Sync queued - will retry when online')
+          } else {
+            showError('Sync failed: ' + err.message)
+          }
+        }
       } else {
         // Queue for when we come back online
         queueOperation({
@@ -68,44 +132,17 @@ export const useEnhancedOneDriveStorage = () => {
         })
       }
     }, 1000) // 1 second debounce
-  }, [isOneDriveMode, isOnline])
+  }, [isOneDriveMode, isOnline, createGraphService, queueOperation, showSuccess, showError, showWarning])
 
-  // Immediate save function (used by debounced save and queue processing)
-  const saveToOneDriveImmediate = useCallback(async (todos) => {
-    if (!isOneDriveMode || !isOnline) return
+  // Simple immediate save function (used by conflict resolution)
+  const saveToOneDriveImmediate = useCallback(async (todos, showToast = false) => {
+    if (!isOneDriveMode || !isOnline) return false
 
     try {
       setSyncStatus('syncing')
       setError(null)
 
       const graphService = createGraphService()
-      
-      // Check for conflicts before saving
-      const currentFileInfo = await graphService.getTodosFileInfo()
-      const lastSyncedTime = localStorage.getItem('lastOneDriveSyncTime')
-      
-      // Only check for conflicts if we have sync history and the file was modified significantly after our last sync
-      if (currentFileInfo && lastSyncedTime) {
-        const fileModified = new Date(currentFileInfo.lastModified).getTime()
-        const lastSync = new Date(lastSyncedTime).getTime()
-        const timeDifference = fileModified - lastSync
-        
-        // Only consider it a conflict if the file was modified more than 5 seconds after our last sync
-        // This prevents false conflicts from small timing differences
-        if (timeDifference > 5000) {
-          // Conflict detected - load remote data for comparison
-          const remoteTodos = await graphService.readTodos()
-          setConflictInfo({
-            local: todos,
-            remote: remoteTodos,
-            remoteModified: currentFileInfo.lastModified
-          })
-          
-          setSyncStatus('conflict')
-          return false // Indicate save was not completed
-        }
-      }
-
       await graphService.writeTodos(todos)
       
       // Update sync tracking
@@ -115,33 +152,34 @@ export const useEnhancedOneDriveStorage = () => {
       setSyncStatus('synced')
       lastSavedDataRef.current = todos
 
-      return true // Indicate save was successful
+      // Show success toast if requested
+      if (showToast) {
+        showSuccess('Synced to OneDrive', 2000)
+      }
+
+      return true
     } catch (err) {
       console.error('Error saving to OneDrive:', err)
       setError(err.message)
       setSyncStatus('error')
-      
-      // Queue for retry if it was a network error
-      if (err.message.includes('fetch') || err.message.includes('network')) {
-        queueOperation({
-          type: OPERATION_TYPES.SAVE_TODOS,
-          data: todos
-        })
-      }
-      
+      showError('Sync failed: ' + err.message)
       return false
     }
-  }, [isOneDriveMode, isOnline, createGraphService, queueOperation])
+  }, [isOneDriveMode, isOnline, createGraphService, showSuccess, showError])
 
   // Optimistic save - update UI immediately, sync in background
-  const saveToOneDrive = useCallback((todos) => {
+  const saveToOneDrive = useCallback((todos, showToast = true) => {
     if (!isOneDriveMode) return
 
     // Store optimistic data
     optimisticDataRef.current = todos
     
-    // Trigger debounced save
-    debouncedSave(todos)
+    // Check if data actually changed since last save
+    const hasChanged = !lastSavedDataRef.current || 
+      JSON.stringify(todos) !== JSON.stringify(lastSavedDataRef.current)
+    
+    // Trigger debounced save, only show toast if data changed and showToast is true
+    debouncedSave(todos, hasChanged && showToast)
   }, [isOneDriveMode, debouncedSave])
 
   // Load from OneDrive
@@ -213,6 +251,7 @@ export const useEnhancedOneDriveStorage = () => {
         const now = new Date().toISOString()
         localStorage.setItem('lastOneDriveSyncTime', now)
         setLastSyncTime(new Date())
+        showSuccess('Conflict resolved and synced')
         return todosToSave
       }
     } catch (err) {
@@ -240,6 +279,11 @@ export const useEnhancedOneDriveStorage = () => {
         console.log(`Queue processing completed: ${result.processed} processed, ${result.failed} failed`)
         if (result.success) {
           acknowledgeOnlineStatus()
+          if (result.processed > 0) {
+            showSuccess(`Synced ${result.processed} queued changes`)
+          }
+        } else if (result.failed > 0) {
+          showError(`Failed to sync ${result.failed} changes`)
         }
       })
     }

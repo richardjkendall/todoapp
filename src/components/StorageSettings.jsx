@@ -81,6 +81,38 @@ const ErrorText = styled.div`
   margin-left: ${props => props.theme.spacing.sm};
 `
 
+const HealthIndicator = styled.div`
+  display: flex;
+  align-items: center;
+  gap: ${props => props.theme.spacing.xs};
+  font-size: ${props => props.theme.typography.fontSize.xs};
+  color: ${props => {
+    if (props.score >= 80) return props.theme.colors.success
+    if (props.score >= 60) return props.theme.colors.warning
+    return props.theme.colors.error
+  }};
+  margin-left: ${props => props.theme.spacing.sm};
+`
+
+const HealthBar = styled.div`
+  width: 40px;
+  height: 4px;
+  background: ${props => props.theme.colors.border};
+  border-radius: 2px;
+  overflow: hidden;
+`
+
+const HealthFill = styled.div`
+  width: ${props => props.score}%;
+  height: 100%;
+  background: ${props => {
+    if (props.score >= 80) return props.theme.colors.success
+    if (props.score >= 60) return props.theme.colors.warning  
+    return props.theme.colors.error
+  }};
+  transition: all 0.3s ease;
+`
+
 const StorageSettings = ({ 
   todos, 
   onMigrate, 
@@ -91,6 +123,7 @@ const StorageSettings = ({
   conflictInfo,
   isOnline,
   queueStatus,
+  syncHealthScore,
   STORAGE_TYPES 
 }) => {
   const { isAuthenticated } = useAuth()
@@ -149,6 +182,14 @@ const StorageSettings = ({
         <StorageLabel>
           Local + OneDrive Sync {!isAuthenticated && '(Sign in required)'}
         </StorageLabel>
+        {isAuthenticated && isOneDriveMode && (
+          <HealthIndicator score={syncHealthScore}>
+            <HealthBar>
+              <HealthFill score={syncHealthScore} />
+            </HealthBar>
+            <span>{syncHealthScore}%</span>
+          </HealthIndicator>
+        )}
       </StorageOption>
 
       <SyncStatusIndicator
