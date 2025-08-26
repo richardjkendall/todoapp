@@ -33,9 +33,12 @@ export const AuthProvider = ({ children }) => {
         
         setIsInitialized(true)
         
-        // Now check for existing accounts
+        // Check if user manually logged out
+        const userLoggedOut = localStorage.getItem('userLoggedOut') === 'true'
+        
+        // Now check for existing accounts only if user didn't manually log out
         const accounts = msalInstance.getAllAccounts()
-        if (accounts.length > 0) {
+        if (accounts.length > 0 && !userLoggedOut) {
           setIsAuthenticated(true)
           setUser(accounts[0])
         }
@@ -67,6 +70,9 @@ export const AuthProvider = ({ children }) => {
       const response = await msalInstance.loginPopup(loginRequest)
       
       if (response) {
+        // Clear the logout flag since user is logging in again
+        localStorage.removeItem('userLoggedOut')
+        
         setIsAuthenticated(true)
         setUser(response.account)
         return response
@@ -89,8 +95,14 @@ export const AuthProvider = ({ children }) => {
       setIsLoading(true)
       setError(null)
 
-      await msalInstance.logoutPopup()
+      // Clear any cached tokens for this app without signing out of Microsoft
+      // Note: We don't need to clear the MSAL cache since we're using localStorage flag
+      // to control authentication state
       
+      // Set a flag in localStorage to indicate the user manually logged out
+      localStorage.setItem('userLoggedOut', 'true')
+      
+      // Clear local authentication state
       setIsAuthenticated(false)
       setUser(null)
     } catch (error) {
