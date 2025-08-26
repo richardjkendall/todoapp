@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useToastContext } from '../context/ToastContext'
+import { validateTodos, cleanupTodos } from '../utils/todoValidation'
 
 const BACKUP_REMINDER_KEY = 'lastBackupReminder'
 const BACKUP_REMINDER_INTERVAL = 7 * 24 * 60 * 60 * 1000 // 7 days in milliseconds
@@ -73,51 +74,15 @@ export const useDataIntegrity = (todos, isOneDriveMode) => {
     return () => clearInterval(intervalId)
   }, [isOneDriveMode, showWarning])
 
-  // Validate data integrity
-  const validateTodos = useCallback((todosToValidate) => {
-    const issues = []
-    
-    todosToValidate.forEach((todo, index) => {
-      if (!todo.id) {
-        issues.push(`Todo at index ${index} is missing an ID`)
-      }
-      if (!todo.text || todo.text.trim() === '') {
-        issues.push(`Todo at index ${index} has empty text`)
-      }
-      if (todo.timestamp && isNaN(new Date(todo.timestamp))) {
-        issues.push(`Todo at index ${index} has invalid timestamp`)
-      }
-      if (todo.priority && (todo.priority < 1 || todo.priority > 5)) {
-        issues.push(`Todo at index ${index} has invalid priority: ${todo.priority}`)
-      }
-    })
-
-    return {
-      isValid: issues.length === 0,
-      issues,
-      score: Math.max(0, 100 - (issues.length * 10))
-    }
+  // Validate data integrity using shared utility
+  const validateTodosWrapper = useCallback((todosToValidate) => {
+    return validateTodos(todosToValidate)
   }, [])
 
-  // Auto-cleanup corrupted data
-  const cleanupTodos = useCallback((todosToClean) => {
-    const cleaned = todosToClean.filter(todo => {
-      if (!todo || typeof todo !== 'object') return false
-      if (!todo.id || !todo.text || todo.text.trim() === '') return false
-      return true
-    }).map(todo => ({
-      ...todo,
-      id: todo.id || Date.now() + Math.random(),
-      text: typeof todo.text === 'string' ? todo.text.trim() : String(todo.text || ''),
-      completed: Boolean(todo.completed),
-      timestamp: todo.timestamp || Date.now(),
-      tags: Array.isArray(todo.tags) ? todo.tags : [],
-      priority: (typeof todo.priority === 'number' && todo.priority >= 1 && todo.priority <= 5) 
-        ? todo.priority : 3,
-      order: typeof todo.order === 'number' ? todo.order : 0
-    }))
-
-    const removedCount = todosToClean.length - cleaned.length
+  // Auto-cleanup corrupted data using shared utility
+  const cleanupTodosWrapper = useCallback((todosToClean) => {
+    const { cleaned, removedCount } = cleanupTodos(todosToClean)
+    
     if (removedCount > 0) {
       showWarning(`Removed ${removedCount} corrupted todo(s) during cleanup`)
     }
@@ -128,7 +93,7 @@ export const useDataIntegrity = (todos, isOneDriveMode) => {
   return {
     syncHealthScore,
     lastBackupCheck,
-    validateTodos,
-    cleanupTodos
+    validateTodos: validateTodosWrapper,
+    cleanupTodos: cleanupTodosWrapper
   }
 }

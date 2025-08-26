@@ -14,7 +14,10 @@ export const PRIORITY_COLORS = {
   1: '#6c757d'  // Gray
 }
 
-export const DEFAULT_PRIORITY = 3
+import { DEFAULT_PRIORITY } from './todoValidation'
+
+// Re-export for backward compatibility
+export { DEFAULT_PRIORITY }
 
 export const getPriorityLabel = (priority) => {
   return PRIORITY_LABELS[priority] || PRIORITY_LABELS[DEFAULT_PRIORITY]

@@ -634,19 +634,20 @@ export const TagDeleteButton = styled.button`
   }
 `
 
-export const CompleteButton = styled.button`
+// Base icon button component with variants
+export const BaseIconButton = styled.button`
   background: none;
   border: none;
   padding: 0.5rem;
   font-size: 1rem;
   cursor: pointer;
-  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   min-width: 2.5rem;
   height: 2.5rem;
   color: ${props => props.theme.colors.text.primary};
+  flex-shrink: ${props => props.variant === 'complete' ? '0' : 'initial'};
   
   &:hover {
     opacity: 0.7;
@@ -659,6 +660,9 @@ export const CompleteButton = styled.button`
     height: 3rem;
   }
 `
+
+// Variant aliases for backward compatibility
+export const CompleteButton = styled(BaseIconButton)``
 
 export const EditInput = styled.input`
   width: 100%;
@@ -718,77 +722,6 @@ export const ButtonGroup = styled.div`
   flex-shrink: 0;
 `
 
-export const EditButton = styled.button`
-  background: none;
-  border: none;
-  padding: 0.5rem;
-  font-size: 1rem;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 2.5rem;
-  height: 2.5rem;
-  color: ${props => props.theme.colors.text.primary};
-  
-  &:hover {
-    opacity: 0.7;
-  }
-  
-  @media (min-width: 768px) {
-    padding: 0.625rem;
-    font-size: 1.2rem;
-    min-width: 3rem;
-    height: 3rem;
-  }
-`
-
-export const CancelButton = styled.button`
-  background: none;
-  border: none;
-  padding: 0.5rem;
-  font-size: 1rem;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 2.5rem;
-  height: 2.5rem;
-  color: ${props => props.theme.colors.text.primary};
-  
-  &:hover {
-    opacity: 0.7;
-  }
-  
-  @media (min-width: 768px) {
-    padding: 0.625rem;
-    font-size: 1.2rem;
-    min-width: 3rem;
-    height: 3rem;
-  }
-`
-
-export const DeleteButton = styled.button`
-  background: none;
-  border: none;
-  padding: 0.5rem;
-  font-size: 1rem;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 2.5rem;
-  height: 2.5rem;
-  color: ${props => props.theme.colors.text.primary};
-  
-  &:hover {
-    opacity: 0.7;
-  }
-  
-  @media (min-width: 768px) {
-    padding: 0.625rem;
-    font-size: 1.2rem;
-    min-width: 3rem;
-    height: 3rem;
-  }
-`
+export const EditButton = styled(BaseIconButton)``
+export const CancelButton = styled(BaseIconButton)``
+export const DeleteButton = styled(BaseIconButton)``

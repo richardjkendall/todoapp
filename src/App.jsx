@@ -1,4 +1,3 @@
-import React from 'react'
 import { ThemeProvider as StyledThemeProvider } from 'styled-components'
 import TodoForm from './components/TodoForm'
 import TodoList from './components/TodoList'

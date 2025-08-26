@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import styled, { useTheme } from 'styled-components'
 import useScrollSpy from '../hooks/useScrollSpy'
 
@@ -7,52 +7,51 @@ const StickyContainer = styled.div`
 `
 
 const StickyContent = styled.div`
+  --sticky-position: ${props => props.isSticky ? 'fixed' : 'relative'};
+  --sticky-top: ${props => props.isSticky ? '0' : 'auto'};
+  --sticky-width: ${props => props.isSticky ? '100vw' : 'auto'};
+  --sticky-padding-v: ${props => props.isSticky ? props.theme.spacing.sm : '0'};
+  --sticky-padding-h: ${props => props.isSticky ? props.theme.spacing.md : '0'};
+  --sticky-background: ${props => props.isSticky ? 'rgba(30, 30, 30, 0.95)' : 'transparent'};
+  --sticky-shadow: ${props => props.isSticky ? '0 4px 20px rgba(0, 0, 0, 0.15)' : 'none'};
+  --sticky-border: ${props => props.isSticky ? `1px solid ${props.theme.colors.border}` : 'none'};
+  --sticky-backdrop: ${props => props.isSticky ? 'blur(12px)' : 'none'};
+  
+  position: var(--sticky-position);
+  top: var(--sticky-top);
+  left: ${props => props.isSticky ? '0' : 'auto'};
+  right: ${props => props.isSticky ? '0' : 'auto'};
+  width: var(--sticky-width);
+  padding: var(--sticky-padding-v) var(--sticky-padding-h);
+  background: var(--sticky-background);
+  box-shadow: var(--sticky-shadow);
+  border-bottom: var(--sticky-border);
+  backdrop-filter: var(--sticky-backdrop);
+  -webkit-backdrop-filter: var(--sticky-backdrop);
+  will-change: ${props => props.isSticky ? 'transform' : 'auto'};
+  z-index: 100;
+  
   transition: transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94), 
               box-shadow 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94),
               border-bottom 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94),
               backdrop-filter 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94),
               background 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-  z-index: 100;
-  
-  @media (max-width: 800px) {
-    transition: background 0.15s ease,
-                transform 0.2s ease;
+
+  @media (min-width: 768px) {
+    --sticky-padding-h: ${props => props.isSticky ? props.theme.spacing.xl : '0'};
   }
   
-  ${props => props.isSticky && `
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    width: 100vw;
-    padding: ${props.theme.spacing.sm} ${props.theme.spacing.md};
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-    border-bottom: 1px solid ${props.theme.colors.border};
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    background: rgba(30, 30, 30, 0.95);
-    will-change: transform;
-    
-    @media (min-width: 768px) {
-      padding: ${props.theme.spacing.sm} ${props.theme.spacing.xl};
-    }
-    
-    @media (min-width: 1024px) {
-      padding: ${props.theme.spacing.sm} max(${props.theme.spacing['2xl']}, calc((100vw - 1200px) / 2 + ${props.theme.spacing['2xl']}));
-    }
-    
-    @media (max-width: 800px) {
-      backdrop-filter: none;
-      -webkit-backdrop-filter: none;
-      background: rgba(30, 30, 30, 0.98);
-      padding-right: calc(${props.theme.spacing.md} + env(scrollbar-width, 15px));
-    }
-  `}
+  @media (min-width: 1024px) {
+    --sticky-padding-h: ${props => props.isSticky ? `max(${props.theme.spacing['2xl']}, calc((100vw - 1200px) / 2 + ${props.theme.spacing['2xl']}))` : '0'};
+  }
   
-  ${props => !props.isSticky && `
-    padding: 0;
-    background: transparent;
-  `}
+  @media (max-width: 800px) {
+    --sticky-background: ${props => props.isSticky ? 'rgba(30, 30, 30, 0.98)' : 'transparent'};
+    --sticky-backdrop: none;
+    --sticky-padding-h: ${props => props.isSticky ? `calc(${props.theme.spacing.md} + env(scrollbar-width, 15px))` : '0'};
+    
+    transition: background 0.15s ease, transform 0.2s ease;
+  }
 `
 
 const StickyPlaceholder = styled.div`
@@ -279,26 +278,39 @@ const StickyHeader = ({ children, actions, forceSticky = false }) => {
       setHasBeenSticky(false)
     }
   }, [isScrolled, forceSticky])
+  
   const contentRef = useRef(null)
   const placeholderRef = useRef(null)
   const theme = useTheme()
 
-  useEffect(() => {
+  // Memoize theme object to prevent recreation on every render
+  const enhancedTheme = useMemo(() => ({
+    ...theme,
+    isDark: theme.colors.background === '#1E1E1E'
+  }), [theme])
+
+  // Memoize height calculation to prevent unnecessary DOM reads
+  const updatePlaceholderHeight = useCallback(() => {
     if (contentRef.current && placeholderRef.current) {
       const height = contentRef.current.offsetHeight
-      if (shouldBeSticky) {
-        placeholderRef.current.style.height = `${height}px`
-      } else {
-        placeholderRef.current.style.height = '0px'
+      const targetHeight = shouldBeSticky ? `${height}px` : '0px'
+      
+      // Only update if height actually changed
+      if (placeholderRef.current.style.height !== targetHeight) {
+        placeholderRef.current.style.height = targetHeight
       }
     }
   }, [shouldBeSticky])
 
+  useEffect(() => {
+    updatePlaceholderHeight()
+  }, [updatePlaceholderHeight])
+
   return (
     <StickyContainer>
       <StickyPlaceholder ref={placeholderRef} />
-      <StickyContent ref={contentRef} isSticky={shouldBeSticky} theme={{...theme, isDark: theme.colors.background === '#1E1E1E'}}>
-<CompactHeader isSticky={shouldBeSticky}>
+      <StickyContent ref={contentRef} isSticky={shouldBeSticky} theme={enhancedTheme}>
+        <CompactHeader isSticky={shouldBeSticky}>
           <CompactTitle isSticky={shouldBeSticky}>Todo List</CompactTitle>
           <ActionsContainer isSticky={shouldBeSticky}>
             {actions}
