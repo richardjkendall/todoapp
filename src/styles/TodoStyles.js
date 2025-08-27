@@ -127,7 +127,7 @@ export const ContentArea = styled.div`
   margin-top: ${props => props.theme.spacing.lg};
   
   /* Add conditional padding to prevent content from being obscured by sticky header */
-  padding-top: ${props => props.headerIsSticky ? '5px' : '0'};
+  padding-top: ${props => props.headerIsSticky ? '15px' : '0'};
   transition: padding-top 0.3s ease;
   
   @media (min-width: 768px) {
@@ -557,7 +557,38 @@ export const TodoHeader = styled.div`
 `
 
 export const TodoTimestamp = styled.span`
-  color: ${props => props.theme.colors.text.secondary};
+  color: ${props => {
+    switch(props.highlightLevel) {
+      case 'urgent':
+        return props.theme.colors.error;
+      case 'warning':
+        return props.theme.colors.warning;
+      default:
+        return props.theme.colors.text.secondary;
+    }
+  }};
+  
+  ${props => props.highlightLevel === 'urgent' && `
+    background-color: ${props.theme.colors.error}20;
+    padding: 2px 6px;
+    border-radius: ${props.theme.borderRadius.sm};
+    font-weight: ${props.theme.typography.fontWeight.medium};
+    animation: pulse 2s ease-in-out infinite;
+    
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.7; }
+    }
+  `}
+  
+  ${props => props.highlightLevel === 'warning' && `
+    background-color: ${props.theme.colors.warning}15;
+    padding: 1px 4px;
+    border-radius: ${props.theme.borderRadius.sm};
+    font-weight: ${props.theme.typography.fontWeight.medium};
+  `}
+  
+  transition: all 0.2s ease;
 `
 
 export const PriorityIndicator = styled.div`

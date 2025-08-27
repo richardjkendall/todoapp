@@ -25,6 +25,13 @@ const ConflictContent = styled.div`
   overflow-y: auto;
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
   border: 1px solid ${props => props.theme.colors.border};
+  
+  @media (max-width: 767px) {
+    padding: ${props => props.theme.spacing.md};
+    max-height: 90vh;
+    margin: ${props => props.theme.spacing.xs};
+    border-radius: ${props => props.theme.borderRadius.md};
+  }
 `
 
 const ConflictHeader = styled.div`
@@ -37,6 +44,11 @@ const ConflictTitle = styled.h2`
   font-weight: ${props => props.theme.typography.fontWeight.semibold};
   color: ${props => props.theme.colors.text.primary};
   margin: 0 0 ${props => props.theme.spacing.sm} 0;
+  
+  @media (max-width: 767px) {
+    font-size: ${props => props.theme.typography.fontSize.lg};
+    text-align: center;
+  }
 `
 
 const ConflictDescription = styled.p`
@@ -51,8 +63,10 @@ const VersionComparison = styled.div`
   gap: ${props => props.theme.spacing.lg};
   margin-bottom: ${props => props.theme.spacing.lg};
   
-  @media (max-width: 768px) {
+  @media (max-width: 767px) {
     grid-template-columns: 1fr;
+    gap: ${props => props.theme.spacing.md};
+    margin-bottom: ${props => props.theme.spacing.md};
   }
 `
 
@@ -68,6 +82,10 @@ const VersionPanel = styled.div`
   
   &:hover {
     border-color: ${props => props.theme.colors.primary};
+  }
+  
+  @media (max-width: 767px) {
+    padding: ${props => props.theme.spacing.sm};
   }
 `
 
@@ -91,6 +109,11 @@ const TodoList = styled.div`
   border: 1px solid ${props => props.theme.colors.border};
   border-radius: ${props => props.theme.borderRadius.sm};
   padding: ${props => props.theme.spacing.sm};
+  
+  @media (max-width: 767px) {
+    max-height: 120px;
+    padding: ${props => props.theme.spacing.xs};
+  }
 `
 
 const TodoItem = styled.div`
@@ -113,6 +136,10 @@ const ResolutionOptions = styled.div`
   flex-direction: column;
   gap: ${props => props.theme.spacing.sm};
   margin-bottom: ${props => props.theme.spacing.lg};
+  
+  @media (max-width: 767px) {
+    margin-bottom: ${props => props.theme.spacing.md};
+  }
 `
 
 const ResolutionOption = styled.label`
@@ -127,11 +154,22 @@ const ResolutionOption = styled.label`
   &:hover {
     background: ${props => props.theme.colors.surface};
   }
+  
+  @media (max-width: 767px) {
+    padding: ${props => props.theme.spacing.xs} ${props => props.theme.spacing.sm};
+    align-items: flex-start;
+    gap: ${props => props.theme.spacing.xs};
+  }
 `
 
 const RadioInput = styled.input`
   margin: 0;
   cursor: pointer;
+  flex-shrink: 0;
+  
+  @media (max-width: 767px) {
+    margin-top: 2px;
+  }
 `
 
 const OptionText = styled.div`
@@ -152,6 +190,11 @@ const ActionButtons = styled.div`
   display: flex;
   gap: ${props => props.theme.spacing.md};
   justify-content: flex-end;
+  
+  @media (max-width: 767px) {
+    justify-content: stretch;
+    gap: ${props => props.theme.spacing.sm};
+  }
 `
 
 const ActionButton = styled.button`
@@ -173,6 +216,13 @@ const ActionButton = styled.button`
     opacity: 0.6;
     cursor: not-allowed;
   }
+  
+  @media (max-width: 767px) {
+    flex: 1;
+    padding: ${props => props.theme.spacing.md};
+    font-size: ${props => props.theme.typography.fontSize.md};
+    min-height: 44px; /* Touch-friendly minimum */
+  }
 `
 
 const ConflictResolution = ({ conflictInfo, onResolve, isLoading }) => {
@@ -182,6 +232,9 @@ const ConflictResolution = ({ conflictInfo, onResolve, isLoading }) => {
   if (!conflictInfo) return null
 
   const { local, remote, localModified, remoteModified } = conflictInfo
+  
+  // Check if mobile view
+  const isMobile = typeof window !== 'undefined' && window.innerWidth <= 767
 
   const handleResolve = () => {
     let selectedTodos
@@ -207,10 +260,12 @@ const ConflictResolution = ({ conflictInfo, onResolve, isLoading }) => {
     <ConflictModal>
       <ConflictContent>
         <ConflictHeader>
-          <ConflictTitle>Sync Conflict Detected</ConflictTitle>
+          <ConflictTitle>Sync Conflict</ConflictTitle>
           <ConflictDescription>
-            Your todos were modified in OneDrive by another device or session. 
-            Please choose how to resolve this conflict.
+            {isMobile 
+              ? 'Choose which version to keep:'
+              : 'Your todos were modified in OneDrive by another device or session. Please choose how to resolve this conflict.'
+            }
           </ConflictDescription>
         </ConflictHeader>
 
@@ -219,36 +274,40 @@ const ConflictResolution = ({ conflictInfo, onResolve, isLoading }) => {
             selected={selectedVersion === 'local'}
             onClick={() => setSelectedVersion('local')}
           >
-            <VersionTitle>Your Local Version</VersionTitle>
+            <VersionTitle>{isMobile ? 'Local' : 'Your Local Version'}</VersionTitle>
             <VersionInfo>
               {local.length} todos • Modified {localModified ? new Date(localModified).toLocaleString() : 'recently'}
             </VersionInfo>
-            <TodoList>
-              {local.slice(0, 10).map((todo, index) => (
-                <TodoItem key={todo.id || index} completed={todo.completed}>
-                  {todo.text}
-                </TodoItem>
-              ))}
-              {local.length > 10 && <TodoItem>... and {local.length - 10} more</TodoItem>}
-            </TodoList>
+            {!isMobile && (
+              <TodoList>
+                {local.slice(0, 10).map((todo, index) => (
+                  <TodoItem key={todo.id || index} completed={todo.completed}>
+                    {todo.text}
+                  </TodoItem>
+                ))}
+                {local.length > 10 && <TodoItem>... and {local.length - 10} more</TodoItem>}
+              </TodoList>
+            )}
           </VersionPanel>
 
           <VersionPanel 
             selected={selectedVersion === 'remote'}
             onClick={() => setSelectedVersion('remote')}
           >
-            <VersionTitle>OneDrive Version</VersionTitle>
+            <VersionTitle>{isMobile ? 'OneDrive' : 'OneDrive Version'}</VersionTitle>
             <VersionInfo>
               {remote.length} todos • Modified {remoteModified ? new Date(remoteModified).toLocaleString() : 'recently'}
             </VersionInfo>
-            <TodoList>
-              {remote.slice(0, 10).map((todo, index) => (
-                <TodoItem key={todo.id || index} completed={todo.completed}>
-                  {todo.text}
-                </TodoItem>
-              ))}
-              {remote.length > 10 && <TodoItem>... and {remote.length - 10} more</TodoItem>}
-            </TodoList>
+            {!isMobile && (
+              <TodoList>
+                {remote.slice(0, 10).map((todo, index) => (
+                  <TodoItem key={todo.id || index} completed={todo.completed}>
+                    {todo.text}
+                  </TodoItem>
+                ))}
+                {remote.length > 10 && <TodoItem>... and {remote.length - 10} more</TodoItem>}
+              </TodoList>
+            )}
           </VersionPanel>
         </VersionComparison>
 
@@ -262,9 +321,9 @@ const ConflictResolution = ({ conflictInfo, onResolve, isLoading }) => {
               onChange={(e) => setSelectedResolution(e.target.value)}
             />
             <OptionText>
-              <OptionTitle>Smart Merge (Recommended)</OptionTitle>
+              <OptionTitle>Smart Merge {isMobile ? '' : '(Recommended)'}</OptionTitle>
               <OptionDescription>
-                Combine both versions, keeping your local changes for any conflicts
+                {isMobile ? 'Combine both versions' : 'Combine both versions, keeping your local changes for any conflicts'}
               </OptionDescription>
             </OptionText>
           </ResolutionOption>
@@ -278,9 +337,9 @@ const ConflictResolution = ({ conflictInfo, onResolve, isLoading }) => {
               onChange={(e) => setSelectedResolution(e.target.value)}
             />
             <OptionText>
-              <OptionTitle>Use Local Version</OptionTitle>
+              <OptionTitle>{isMobile ? 'Use Local' : 'Use Local Version'}</OptionTitle>
               <OptionDescription>
-                Replace OneDrive with your current local todos
+                {isMobile ? 'Keep your current todos' : 'Replace OneDrive with your current local todos'}
               </OptionDescription>
             </OptionText>
           </ResolutionOption>
@@ -294,9 +353,9 @@ const ConflictResolution = ({ conflictInfo, onResolve, isLoading }) => {
               onChange={(e) => setSelectedResolution(e.target.value)}
             />
             <OptionText>
-              <OptionTitle>Use OneDrive Version</OptionTitle>
+              <OptionTitle>{isMobile ? 'Use OneDrive' : 'Use OneDrive Version'}</OptionTitle>
               <OptionDescription>
-                Replace your local todos with the OneDrive version
+                {isMobile ? 'Use the cloud version' : 'Replace your local todos with the OneDrive version'}
               </OptionDescription>
             </OptionText>
           </ResolutionOption>

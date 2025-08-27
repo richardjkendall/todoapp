@@ -143,6 +143,7 @@ const TodoItem = ({
   }
 
   const priorityColor = getPriorityColor(todo.priority || DEFAULT_PRIORITY)
+  const timestampData = formatTimestamp(todo.timestamp, todo.priority)
 
   return (
     <StyledTodoItem 
@@ -164,8 +165,8 @@ const TodoItem = ({
       </TodoLeftColumn>
       <TodoContent>
         <TodoHeader>
-          <TodoTimestamp>
-            {formatTimestamp(todo.timestamp)}
+          <TodoTimestamp highlightLevel={timestampData.highlightLevel}>
+            {timestampData.displayText}
           </TodoTimestamp>
         </TodoHeader>
         {isEditing ? (
