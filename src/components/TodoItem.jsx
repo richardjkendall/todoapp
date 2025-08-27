@@ -3,6 +3,9 @@ import Tag from './Tag'
 import { EditIcon, CheckIcon, UndoIcon, DeleteIcon, SaveIcon, CancelIcon } from './Icons'
 import { 
   TodoItem as StyledTodoItem, 
+  SwipeContainer,
+  SwipeContent,
+  SwipeAction,
   TodoNumber,
   TodoLeftColumn,
   TodoContent, 
@@ -20,6 +23,7 @@ import {
   CompleteButton 
 } from '../styles/TodoStyles'
 import { getPriorityColor, DEFAULT_PRIORITY } from '../utils/priority'
+import useSwipeGesture from '../hooks/useSwipeGesture'
 
 const TodoItem = ({ 
   todo, 
@@ -145,87 +149,145 @@ const TodoItem = ({
   const priorityColor = getPriorityColor(todo.priority || DEFAULT_PRIORITY)
   const timestampData = formatTimestamp(todo.timestamp, todo.priority)
 
+  // Swipe gesture handlers
+  const handleSwipeComplete = () => {
+    if (!todo.completed) {
+      onToggleComplete(todo.id)
+    }
+  }
+
+  const handleSwipeDelete = () => {
+    if (todo.completed) {
+      onDeleteTodo(todo.id)
+    }
+  }
+
+  // Configure swipe gestures based on todo state
+  const swipeConfig = {
+    threshold: 80,
+    velocityThreshold: 0.3,
+    preventDefaultThreshold: 15,
+    restoreSpeed: 250,
+    maxVerticalMovement: 30
+  }
+
+  const {
+    swipeOffset,
+    actionRevealed,
+    isAnimating,
+    touchHandlers,
+    resetSwipe
+  } = useSwipeGesture(
+    todo.completed ? handleSwipeDelete : null, // Only allow delete swipe for completed todos
+    !todo.completed ? handleSwipeComplete : null, // Only allow complete swipe for incomplete todos
+    swipeConfig
+  )
+
+  // Disable drag and drop during swipe
+  const isDragDisabled = isEditing || searchActive || Math.abs(swipeOffset) > 10
+
   return (
     <StyledTodoItem 
       priorityColor={priorityColor}
       isDragging={isDragging}
       showDropIndicator={showDropIndicator}
-      draggable={!isEditing && !todo.completed && !searchActive}
+      draggable={!isDragDisabled}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
-      <TodoLeftColumn>
-        <TodoNumber>{position}</TodoNumber>
-        <PriorityIndicator priorityColor={priorityColor}>
-          !{todo.priority || DEFAULT_PRIORITY}
-        </PriorityIndicator>
-      </TodoLeftColumn>
-      <TodoContent>
-        <TodoHeader>
-          <TodoTimestamp highlightLevel={timestampData.highlightLevel}>
-            {timestampData.displayText}
-          </TodoTimestamp>
-        </TodoHeader>
-        {isEditing ? (
-          <EditTextarea
-            ref={textareaRef}
-            value={editValue}
-            onChange={handleEditChange}
-            onKeyDown={handleKeyPress}
-            placeholder="Edit todo... Use #tags and !1-!5 for priority (Ctrl+Enter to save)"
-            rows={1}
-            autoFocus
+      <SwipeContainer {...touchHandlers}>
+        {/* Swipe action backgrounds */}
+        {!todo.completed && (
+          <SwipeAction 
+            direction="right" 
+            revealed={actionRevealed === 'right'}
           />
-        ) : (
-          <>
-            <TodoText 
-              hasTags={todo.tags && todo.tags.length > 0}
-              completed={todo.completed}
-            >
-              {todo.text}
-            </TodoText>
-            {todo.tags && todo.tags.length > 0 && (
-              <TagContainer>
-                {todo.tags.map((tag, index) => (
-                  <Tag 
-                    key={index} 
-                    tag={tag} 
-                    onDelete={handleRemoveTag}
-                  />
-                ))}
-              </TagContainer>
-            )}
-          </>
         )}
-      </TodoContent>
-      <TodoActions>
-        <ButtonGroup>
-          {isEditing ? (
-            <>
-              <EditButton onClick={saveEdit} title="Save"><SaveIcon /></EditButton>
-              <CancelButton onClick={cancelEdit} title="Cancel"><CancelIcon /></CancelButton>
-            </>
-          ) : (
-            <>
-              {todo.completed ? (
-                <DeleteButton onClick={() => onDeleteTodo(todo.id)} title="Delete"><DeleteIcon /></DeleteButton>
+        {todo.completed && (
+          <SwipeAction 
+            direction="left" 
+            revealed={actionRevealed === 'left'}
+          />
+        )}
+        
+        <SwipeContent 
+          offset={swipeOffset} 
+          isAnimating={isAnimating}
+        >
+          <TodoLeftColumn>
+            <TodoNumber>{position}</TodoNumber>
+            <PriorityIndicator priorityColor={priorityColor}>
+              !{todo.priority || DEFAULT_PRIORITY}
+            </PriorityIndicator>
+          </TodoLeftColumn>
+          <TodoContent>
+            <TodoHeader>
+              <TodoTimestamp highlightLevel={timestampData.highlightLevel}>
+                {timestampData.displayText}
+              </TodoTimestamp>
+            </TodoHeader>
+            {isEditing ? (
+              <EditTextarea
+                ref={textareaRef}
+                value={editValue}
+                onChange={handleEditChange}
+                onKeyDown={handleKeyPress}
+                placeholder="Edit todo... Use #tags and !1-!5 for priority (Ctrl+Enter to save)"
+                rows={1}
+                autoFocus
+              />
+            ) : (
+              <>
+                <TodoText 
+                  hasTags={todo.tags && todo.tags.length > 0}
+                  completed={todo.completed}
+                >
+                  {todo.text}
+                </TodoText>
+                {todo.tags && todo.tags.length > 0 && (
+                  <TagContainer>
+                    {todo.tags.map((tag, index) => (
+                      <Tag 
+                        key={index} 
+                        tag={tag} 
+                        onDelete={handleRemoveTag}
+                      />
+                    ))}
+                  </TagContainer>
+                )}
+              </>
+            )}
+          </TodoContent>
+          <TodoActions>
+            <ButtonGroup>
+              {isEditing ? (
+                <>
+                  <EditButton onClick={saveEdit} title="Save"><SaveIcon /></EditButton>
+                  <CancelButton onClick={cancelEdit} title="Cancel"><CancelIcon /></CancelButton>
+                </>
               ) : (
-                <EditButton onClick={startEdit} title="Edit"><EditIcon /></EditButton>
+                <>
+                  {todo.completed ? (
+                    <DeleteButton onClick={() => onDeleteTodo(todo.id)} title="Delete"><DeleteIcon /></DeleteButton>
+                  ) : (
+                    <EditButton onClick={startEdit} title="Edit"><EditIcon /></EditButton>
+                  )}
+                  <CompleteButton 
+                    completed={todo.completed}
+                    onClick={() => onToggleComplete(todo.id)}
+                    title={todo.completed ? 'Mark as incomplete' : 'Mark as complete'}
+                  >
+                    {todo.completed ? <UndoIcon /> : <CheckIcon />}
+                  </CompleteButton>
+                </>
               )}
-              <CompleteButton 
-                completed={todo.completed}
-                onClick={() => onToggleComplete(todo.id)}
-                title={todo.completed ? 'Mark as incomplete' : 'Mark as complete'}
-              >
-                {todo.completed ? <UndoIcon /> : <CheckIcon />}
-              </CompleteButton>
-            </>
-          )}
-        </ButtonGroup>
-      </TodoActions>
+            </ButtonGroup>
+          </TodoActions>
+        </SwipeContent>
+      </SwipeContainer>
     </StyledTodoItem>
   )
 }

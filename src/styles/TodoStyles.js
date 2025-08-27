@@ -457,6 +457,83 @@ export const TodoList = styled.ul`
   }
 `
 
+export const SwipeContainer = styled.div`
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+`
+
+export const SwipeContent = styled.div`
+  position: relative;
+  z-index: 2;
+  transform: translateX(${props => props.offset}px);
+  transition: ${props => props.isAnimating ? 'transform 0.3s cubic-bezier(0.4, 0.0, 0.2, 1)' : 'none'};
+  will-change: transform;
+  width: 100%;
+  display: flex;
+  align-items: flex-start;
+  gap: ${props => props.theme.spacing.md};
+  
+  @media (max-width: 767px) {
+    gap: ${props => props.theme.spacing.sm};
+  }
+  
+  @media (min-width: 768px) {
+    gap: ${props => props.theme.spacing.md};
+  }
+`
+
+export const SwipeAction = styled.div`
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 120px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: ${props => props.theme.typography.fontSize.xl};
+  font-weight: ${props => props.theme.typography.fontWeight.bold};
+  color: white;
+  z-index: 1;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  
+  ${props => props.direction === 'right' && `
+    left: 0;
+    background: linear-gradient(90deg, ${props.theme.colors.success} 0%, ${props.theme.colors.success}dd 100%);
+    
+    &::before {
+      content: '✓';
+      animation: ${props.revealed ? 'swipeReveal 0.2s ease-out' : 'none'};
+    }
+  `}
+  
+  ${props => props.direction === 'left' && `
+    right: 0;
+    background: linear-gradient(270deg, ${props.theme.colors.error} 0%, ${props.theme.colors.error}dd 100%);
+    
+    &::before {
+      content: '🗑️';
+      animation: ${props.revealed ? 'swipeReveal 0.2s ease-out' : 'none'};
+    }
+  `}
+  
+  ${props => props.revealed && `
+    opacity: 1;
+  `}
+  
+  @keyframes swipeReveal {
+    0% { 
+      transform: scale(0.5);
+      opacity: 0;
+    }
+    100% { 
+      transform: scale(1);
+      opacity: 1;
+    }
+  }
+`
+
 export const TodoItem = styled.li`
   background: ${props => props.theme.colors.card};
   background: linear-gradient(145deg, ${props => props.theme.colors.card} 0%, ${props => props.theme.colors.surface} 100%);
@@ -468,9 +545,6 @@ export const TodoItem = styled.li`
   font-size: ${props => props.theme.typography.fontSize.sm};
   font-weight: ${props => props.theme.typography.fontWeight.normal};
   line-height: ${props => props.theme.typography.lineHeight.normal};
-  display: flex;
-  align-items: flex-start;
-  gap: ${props => props.theme.spacing.md};
   cursor: ${props => props.isDragging ? 'grabbing' : 'grab'};
   opacity: ${props => props.isDragging ? 0.5 : 1};
   transform: ${props => props.isDragging ? 'rotate(2deg)' : 'none'};
