@@ -299,6 +299,34 @@ const useTodos = () => {
     }
   }, [isAuthenticated, isLoaded])
 
+  // PWA visibility change sync - trigger sync when app becomes visible after being hidden
+  useEffect(() => {
+    let lastSyncCheck = Date.now()
+    
+    const handleVisibilityChange = () => {
+      if (!document.hidden && isAuthenticated && isLoaded) {
+        const timeSinceLastCheck = Date.now() - lastSyncCheck
+        // Only sync if app was hidden for more than 30 seconds to avoid excessive syncing
+        if (timeSinceLastCheck > 30000) {
+          console.log('App became visible after', Math.round(timeSinceLastCheck / 1000), 'seconds - triggering sync')
+          const timeoutId = setTimeout(syncOnModeChangeRef.current, 1000)
+          // Update last sync check time
+          lastSyncCheck = Date.now()
+          return () => clearTimeout(timeoutId)
+        } else {
+          console.log('App became visible but too soon since last check (', Math.round(timeSinceLastCheck / 1000), 'seconds) - skipping sync')
+        }
+        lastSyncCheck = Date.now()
+      }
+    }
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+  }, [isAuthenticated, isLoaded])
+
   return {
     // Core state
     todos: search.isSearchActive ? search.filteredTodos : todos,
