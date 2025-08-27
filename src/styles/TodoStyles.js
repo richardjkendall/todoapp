@@ -501,25 +501,19 @@ export const SwipeAction = styled.div`
   ${props => props.direction === 'right' && `
     left: 0;
     background: linear-gradient(90deg, ${props.theme.colors.success} 0%, ${props.theme.colors.success}dd 100%);
-    
-    &::before {
-      content: '✓';
-      animation: ${props.revealed ? 'swipeReveal 0.2s ease-out' : 'none'};
-    }
   `}
   
   ${props => props.direction === 'left' && `
     right: 0;
     background: linear-gradient(270deg, ${props.theme.colors.error} 0%, ${props.theme.colors.error}dd 100%);
-    
-    &::before {
-      content: '🗑️';
-      animation: ${props.revealed ? 'swipeReveal 0.2s ease-out' : 'none'};
-    }
   `}
   
   ${props => props.revealed && `
     opacity: 1;
+    
+    svg {
+      animation: swipeReveal 0.2s ease-out;
+    }
   `}
   
   @keyframes swipeReveal {

@@ -45,6 +45,7 @@ const TodoItem = ({
   const [isDragging, setIsDragging] = useState(false)
   const [showDropIndicator, setShowDropIndicator] = useState(false)
   const textareaRef = useRef(null)
+  const swipeContainerRef = useRef(null)
 
   const startEdit = () => {
     setIsEditing(true)
@@ -186,6 +187,22 @@ const TodoItem = ({
   // Disable drag and drop during swipe
   const isDragDisabled = isEditing || searchActive || Math.abs(swipeOffset) > 10
 
+  // Add non-passive touchmove listener to prevent scroll interference
+  useEffect(() => {
+    const container = swipeContainerRef.current
+    if (!container) return
+
+    const handleTouchMove = (e) => {
+      touchHandlers.onTouchMove(e)
+    }
+
+    container.addEventListener('touchmove', handleTouchMove, { passive: false })
+    
+    return () => {
+      container.removeEventListener('touchmove', handleTouchMove)
+    }
+  }, [touchHandlers])
+
   return (
     <StyledTodoItem 
       priorityColor={priorityColor}
@@ -198,19 +215,28 @@ const TodoItem = ({
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
-      <SwipeContainer {...touchHandlers}>
+      <SwipeContainer
+        ref={swipeContainerRef}
+        onTouchStart={touchHandlers.onTouchStart}
+        onTouchEnd={touchHandlers.onTouchEnd}
+        onTouchCancel={touchHandlers.onTouchCancel}
+      >
         {/* Swipe action backgrounds */}
         {!todo.completed && (
           <SwipeAction 
             direction="right" 
             revealed={actionRevealed === 'right'}
-          />
+          >
+            <CheckIcon />
+          </SwipeAction>
         )}
         {todo.completed && (
           <SwipeAction 
             direction="left" 
             revealed={actionRevealed === 'left'}
-          />
+          >
+            <DeleteIcon />
+          </SwipeAction>
         )}
         
         <SwipeContent 
