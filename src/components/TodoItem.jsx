@@ -182,11 +182,24 @@ const TodoItem = ({
     }
   }
 
-  const handleSwipeDelete = () => {
-    if (todo.completed) {
-      onDeleteTodo(todo.id)
+  const handleSwipeEdit = () => {
+    if (!todo.completed) {
+      startEdit()
     }
   }
+
+  const handleSwipeUndo = () => {
+    if (todo.completed) {
+      onToggleComplete(todo.id) // Make incomplete (undo completion)
+    }
+  }
+
+  const handleSwipeDelete = () => {
+    if (todo.completed) {
+      onDeleteTodo(todo.id) // Delete completed todo
+    }
+  }
+
 
   // Configure swipe gestures based on todo state
   const swipeConfig = {
@@ -204,16 +217,31 @@ const TodoItem = ({
     touchHandlers,
     resetSwipe
   } = useSwipeGesture(
-    todo.completed ? handleSwipeDelete : null, // Only allow delete swipe for completed todos
-    !todo.completed ? handleSwipeComplete : null, // Only allow complete swipe for incomplete todos
+    todo.completed ? handleSwipeDelete : handleSwipeEdit, // Left swipe: delete if completed, edit if incomplete
+    todo.completed ? handleSwipeUndo : handleSwipeComplete, // Right swipe: undo if completed, complete if incomplete
     swipeConfig
   )
 
-  // Disable drag and drop during active swipe animation or when editing/searching
-  const isDragDisabled = isEditing || searchActive || (isAnimating && Math.abs(swipeOffset) > 50)
-
-  // Add non-passive touchmove listener to prevent scroll interference
+  // Check if we're on a mobile device (using media query for more accurate detection)
+  const [isMobileDevice, setIsMobileDevice] = useState(false)
+  
   useEffect(() => {
+    const mediaQuery = window.matchMedia('(max-width: 767px)')
+    const handleMediaQueryChange = (e) => setIsMobileDevice(e.matches)
+    
+    setIsMobileDevice(mediaQuery.matches)
+    mediaQuery.addListener(handleMediaQueryChange)
+    
+    return () => mediaQuery.removeListener(handleMediaQueryChange)
+  }, [])
+
+  // Disable drag and drop on mobile devices or during swipe/edit/search
+  const isDragDisabled = isMobileDevice || isEditing || searchActive || (isAnimating && Math.abs(swipeOffset) > 50)
+
+  // Add non-passive touchmove listener to prevent scroll interference (mobile only)
+  useEffect(() => {
+    if (!isMobileDevice) return
+    
     const container = swipeContainerRef.current
     if (!container) return
 
@@ -226,7 +254,7 @@ const TodoItem = ({
     return () => {
       container.removeEventListener('touchmove', handleTouchMove)
     }
-  }, [touchHandlers])
+  }, [touchHandlers, isMobileDevice])
 
   return (
     <StyledTodoItem 
@@ -240,26 +268,31 @@ const TodoItem = ({
     >
       <SwipeContainer
         ref={swipeContainerRef}
-        onTouchStart={touchHandlers.onTouchStart}
-        onTouchEnd={touchHandlers.onTouchEnd}
-        onTouchCancel={touchHandlers.onTouchCancel}
+        onTouchStart={isMobileDevice ? touchHandlers.onTouchStart : undefined}
+        onTouchEnd={isMobileDevice ? touchHandlers.onTouchEnd : undefined}
+        onTouchCancel={isMobileDevice ? touchHandlers.onTouchCancel : undefined}
       >
-        {/* Swipe action backgrounds */}
-        {!todo.completed && (
-          <SwipeAction 
-            direction="right" 
-            revealed={actionRevealed === 'right'}
-          >
-            <CheckIcon />
-          </SwipeAction>
-        )}
-        {todo.completed && (
-          <SwipeAction 
-            direction="left" 
-            revealed={actionRevealed === 'left'}
-          >
-            <DeleteIcon />
-          </SwipeAction>
+        {/* Swipe action backgrounds (mobile only) */}
+        {isMobileDevice && (
+          <>
+            {/* Right swipe: Complete incomplete todos OR undo completed todos */}
+            <SwipeAction 
+              direction="right" 
+              revealed={actionRevealed === 'right'}
+              actionType={todo.completed ? 'undo' : 'complete'}
+            >
+              {todo.completed ? <UndoIcon /> : <CheckIcon />}
+            </SwipeAction>
+            
+            {/* Left swipe: Edit incomplete todos OR delete completed todos */}
+            <SwipeAction 
+              direction="left" 
+              revealed={actionRevealed === 'left'}
+              actionType={todo.completed ? 'delete' : 'edit'}
+            >
+              {todo.completed ? <DeleteIcon /> : <EditIcon />}
+            </SwipeAction>
+          </>
         )}
         
         <SwipeContent 
@@ -313,31 +346,34 @@ const TodoItem = ({
               </>
             )}
           </TodoContent>
-          <TodoActions>
-            <ButtonGroup>
-              {isEditing ? (
-                <>
-                  <EditButton onClick={saveEdit} title="Save"><SaveIcon /></EditButton>
-                  <CancelButton onClick={cancelEdit} title="Cancel"><CancelIcon /></CancelButton>
-                </>
-              ) : (
-                <>
-                  {todo.completed ? (
-                    <DeleteButton onClick={() => onDeleteTodo(todo.id)} title="Delete"><DeleteIcon /></DeleteButton>
-                  ) : (
-                    <EditButton onClick={startEdit} title="Edit"><EditIcon /></EditButton>
-                  )}
-                  <CompleteButton 
-                    completed={todo.completed}
-                    onClick={() => onToggleComplete(todo.id)}
-                    title={todo.completed ? 'Mark as incomplete' : 'Mark as complete'}
-                  >
-                    {todo.completed ? <UndoIcon /> : <CheckIcon />}
-                  </CompleteButton>
-                </>
-              )}
-            </ButtonGroup>
-          </TodoActions>
+          {/* Show actions only on desktop, or when editing (save/cancel needed even on mobile) */}
+          {(!isMobileDevice || isEditing) && (
+            <TodoActions>
+              <ButtonGroup>
+                {isEditing ? (
+                  <>
+                    <EditButton onClick={saveEdit} title="Save"><SaveIcon /></EditButton>
+                    <CancelButton onClick={cancelEdit} title="Cancel"><CancelIcon /></CancelButton>
+                  </>
+                ) : (
+                  <>
+                    {todo.completed ? (
+                      <DeleteButton onClick={() => onDeleteTodo(todo.id)} title="Delete"><DeleteIcon /></DeleteButton>
+                    ) : (
+                      <EditButton onClick={startEdit} title="Edit"><EditIcon /></EditButton>
+                    )}
+                    <CompleteButton 
+                      completed={todo.completed}
+                      onClick={() => onToggleComplete(todo.id)}
+                      title={todo.completed ? 'Mark as incomplete' : 'Mark as complete'}
+                    >
+                      {todo.completed ? <UndoIcon /> : <CheckIcon />}
+                    </CompleteButton>
+                  </>
+                )}
+              </ButtonGroup>
+            </TodoActions>
+          )}
         </SwipeContent>
       </SwipeContainer>
     </StyledTodoItem>

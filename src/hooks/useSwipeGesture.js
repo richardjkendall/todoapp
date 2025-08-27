@@ -52,13 +52,6 @@ const useSwipeGesture = (onSwipeLeft, onSwipeRight, options = {}) => {
     // Don't interfere with existing drag operations or if animating
     if (isAnimating) return
 
-    // Don't interfere if this looks like it might be a drag operation
-    // (e.g., if the user is pressing on a draggable element)
-    const target = e.target
-    if (target && target.closest('[draggable="true"]')) {
-      return
-    }
-
     const touch = e.touches[0]
     touchStartRef.current = {
       x: touch.clientX,
@@ -73,15 +66,10 @@ const useSwipeGesture = (onSwipeLeft, onSwipeRight, options = {}) => {
   const handleTouchMove = useCallback((e) => {
     if (!touchStartRef.current || isAnimating) return
 
-    // Don't interfere if we're in the middle of a drag operation
-    const target = e.target
-    if (target && target.closest('[draggable="true"]')) {
-      return
-    }
-
     const touch = e.touches[0]
     const deltaX = touch.clientX - touchStartRef.current.x
     const deltaY = touch.clientY - touchStartRef.current.y
+    
     
     touchMoveRef.current = {
       x: touch.clientX,
