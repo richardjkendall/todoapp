@@ -25,6 +25,9 @@ import {
 import { getPriorityColor, DEFAULT_PRIORITY } from '../utils/priority'
 import useSwipeGesture from '../hooks/useSwipeGesture'
 
+// Module-level variable to track currently dragged todo
+let currentDraggedTodo = null
+
 const TodoItem = ({ 
   todo, 
   position,
@@ -101,28 +104,43 @@ const TodoItem = ({
     e.dataTransfer.setData('text/plain', todo.id.toString())
     e.dataTransfer.effectAllowed = 'move'
     setIsDragging(true)
+    // Store the dragged todo for cross-browser compatibility
+    currentDraggedTodo = todo
   }
 
   const handleDragEnd = () => {
     setIsDragging(false)
+    // Clear the dragged todo reference
+    currentDraggedTodo = null
   }
 
   const handleDragOver = (e) => {
     e.preventDefault()
     e.dataTransfer.dropEffect = 'move'
     
-    const draggedId = parseInt(e.dataTransfer.getData('text/plain'))
-    const draggedTodo = sortedTodos.find(t => t.id === draggedId)
+    // Use module-level variable for cross-browser compatibility
+    const draggedTodo = currentDraggedTodo
     
-    // Check if drop is allowed (same priority)
-    const canDrop = draggedTodo && draggedTodo.priority === todo.priority && !todo.completed
+    // Check if drop is allowed (same priority and both not completed)
+    const canDrop = draggedTodo && 
+                   draggedTodo.priority === todo.priority && 
+                   !todo.completed && 
+                   !draggedTodo.completed &&
+                   draggedTodo.id !== todo.id // Can't drop on itself
+    
+    // Find the todo item container to apply classes
+    const todoItemElement = e.currentTarget.closest('[data-todo-item]') || e.currentTarget.parentElement
     
     if (canDrop) {
       setShowDropIndicator(true)
-      e.currentTarget.classList.remove('drag-over-invalid')
+      if (todoItemElement) {
+        todoItemElement.classList.remove('drag-over-invalid')
+      }
     } else {
       setShowDropIndicator(false)
-      e.currentTarget.classList.add('drag-over-invalid')
+      if (todoItemElement) {
+        todoItemElement.classList.add('drag-over-invalid')
+      }
     }
   }
 
@@ -130,7 +148,10 @@ const TodoItem = ({
     // Only hide indicator if leaving the element entirely
     if (!e.currentTarget.contains(e.relatedTarget)) {
       setShowDropIndicator(false)
-      e.currentTarget.classList.remove('drag-over-invalid')
+      const todoItemElement = e.currentTarget.closest('[data-todo-item]') || e.currentTarget.parentElement
+      if (todoItemElement) {
+        todoItemElement.classList.remove('drag-over-invalid')
+      }
     }
   }
 
@@ -139,12 +160,16 @@ const TodoItem = ({
     const draggedId = parseInt(e.dataTransfer.getData('text/plain'))
     const targetIndex = sortedTodos.findIndex(t => t.id === todo.id)
     
+    
     if (draggedId !== todo.id) {
       onReorderTodos(draggedId, targetIndex, sortedTodos)
     }
     
     setShowDropIndicator(false)
-    e.currentTarget.classList.remove('drag-over-invalid')
+    const todoItemElement = e.currentTarget.closest('[data-todo-item]') || e.currentTarget.parentElement
+    if (todoItemElement) {
+      todoItemElement.classList.remove('drag-over-invalid')
+    }
   }
 
   const priorityColor = getPriorityColor(todo.priority || DEFAULT_PRIORITY)
@@ -184,8 +209,8 @@ const TodoItem = ({
     swipeConfig
   )
 
-  // Disable drag and drop during swipe
-  const isDragDisabled = isEditing || searchActive || Math.abs(swipeOffset) > 10
+  // Disable drag and drop during active swipe animation or when editing/searching
+  const isDragDisabled = isEditing || searchActive || (isAnimating && Math.abs(swipeOffset) > 50)
 
   // Add non-passive touchmove listener to prevent scroll interference
   useEffect(() => {
@@ -208,12 +233,10 @@ const TodoItem = ({
       priorityColor={priorityColor}
       isDragging={isDragging}
       showDropIndicator={showDropIndicator}
-      draggable={!isDragDisabled}
-      onDragStart={handleDragStart}
-      onDragEnd={handleDragEnd}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
+      data-todo-item={todo.id}
     >
       <SwipeContainer
         ref={swipeContainerRef}
@@ -242,6 +265,9 @@ const TodoItem = ({
         <SwipeContent 
           offset={swipeOffset} 
           isAnimating={isAnimating}
+          draggable={!isDragDisabled}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
         >
           <TodoLeftColumn>
             <TodoNumber>{position}</TodoNumber>

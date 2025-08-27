@@ -474,6 +474,11 @@ export const SwipeContent = styled.div`
   align-items: flex-start;
   gap: ${props => props.theme.spacing.md};
   background: linear-gradient(145deg, ${props => props.theme.colors.card} 0%, ${props => props.theme.colors.surface} 100%);
+  cursor: ${props => props.draggable ? 'grab' : 'default'};
+  
+  &:active {
+    cursor: ${props => props.draggable ? 'grabbing' : 'default'};
+  }
   
   @media (max-width: 767px) {
     gap: ${props => props.theme.spacing.sm};
@@ -540,7 +545,7 @@ export const TodoItem = styled.li`
   font-size: ${props => props.theme.typography.fontSize.sm};
   font-weight: ${props => props.theme.typography.fontWeight.normal};
   line-height: ${props => props.theme.typography.lineHeight.normal};
-  cursor: ${props => props.isDragging ? 'grabbing' : 'grab'};
+  cursor: default;
   opacity: ${props => props.isDragging ? 0.5 : 1};
   transform: ${props => props.isDragging ? 'rotate(2deg)' : 'none'};
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);

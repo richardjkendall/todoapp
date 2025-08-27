@@ -52,6 +52,13 @@ const useSwipeGesture = (onSwipeLeft, onSwipeRight, options = {}) => {
     // Don't interfere with existing drag operations or if animating
     if (isAnimating) return
 
+    // Don't interfere if this looks like it might be a drag operation
+    // (e.g., if the user is pressing on a draggable element)
+    const target = e.target
+    if (target && target.closest('[draggable="true"]')) {
+      return
+    }
+
     const touch = e.touches[0]
     touchStartRef.current = {
       x: touch.clientX,
@@ -65,6 +72,12 @@ const useSwipeGesture = (onSwipeLeft, onSwipeRight, options = {}) => {
 
   const handleTouchMove = useCallback((e) => {
     if (!touchStartRef.current || isAnimating) return
+
+    // Don't interfere if we're in the middle of a drag operation
+    const target = e.target
+    if (target && target.closest('[draggable="true"]')) {
+      return
+    }
 
     const touch = e.touches[0]
     const deltaX = touch.clientX - touchStartRef.current.x
@@ -84,8 +97,11 @@ const useSwipeGesture = (onSwipeLeft, onSwipeRight, options = {}) => {
       return
     }
 
-    // Prevent default scroll if horizontal movement is significant
-    if (Math.abs(deltaX) > preventDefaultThreshold && !hasPreventedDefaultRef.current) {
+    // Only prevent default if we're clearly in a horizontal swipe motion
+    // and not potentially interfering with drag and drop
+    if (Math.abs(deltaX) > preventDefaultThreshold && 
+        Math.abs(deltaX) > Math.abs(deltaY) * 2 && // Much more horizontal than vertical
+        !hasPreventedDefaultRef.current) {
       e.preventDefault()
       hasPreventedDefaultRef.current = true
     }
