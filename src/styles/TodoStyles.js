@@ -473,6 +473,7 @@ export const SwipeContent = styled.div`
   display: flex;
   align-items: flex-start;
   gap: ${props => props.theme.spacing.md};
+  background: linear-gradient(145deg, ${props => props.theme.colors.card} 0%, ${props => props.theme.colors.surface} 100%);
   
   @media (max-width: 767px) {
     gap: ${props => props.theme.spacing.sm};
