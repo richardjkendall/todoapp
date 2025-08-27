@@ -32,10 +32,8 @@ const ToastContainer = styled.div`
   gap: ${props => props.theme.spacing.sm};
   max-width: 400px;
   
-  @media (max-width: 768px) {
-    right: 16px;
-    left: 16px;
-    max-width: none;
+  @media (max-width: 767px) {
+    display: none; /* Hide toast notifications on mobile */
   }
 `
 
