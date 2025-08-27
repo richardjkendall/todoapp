@@ -506,12 +506,28 @@ export const SwipeAction = styled.div`
   
   ${props => props.direction === 'right' && `
     left: 0;
-    background: linear-gradient(90deg, ${props.theme.colors.success} 0%, ${props.theme.colors.success}dd 100%);
+    background: linear-gradient(90deg, 
+      ${props.actionType === 'undo' 
+        ? props.theme.colors.warning 
+        : props.theme.colors.success} 0%, 
+      ${props.actionType === 'undo' 
+        ? props.theme.colors.warning + 'dd'
+        : props.theme.colors.success + 'dd'} 100%);
   `}
   
   ${props => props.direction === 'left' && `
     right: 0;
-    background: linear-gradient(270deg, ${props.theme.colors.error} 0%, ${props.theme.colors.error}dd 100%);
+    background: linear-gradient(270deg, 
+      ${props.actionType === 'edit' 
+        ? props.theme.colors.primary 
+        : props.actionType === 'delete' 
+        ? props.theme.colors.error 
+        : props.theme.colors.error} 0%, 
+      ${props.actionType === 'edit' 
+        ? props.theme.colors.primary + 'dd'
+        : props.actionType === 'delete' 
+        ? props.theme.colors.error + 'dd'
+        : props.theme.colors.error + 'dd'} 100%);
   `}
   
   ${props => props.revealed && `
