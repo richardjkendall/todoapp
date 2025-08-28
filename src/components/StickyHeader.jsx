@@ -83,25 +83,25 @@ const CompactHeader = styled.div`
   `}
   
   @media (max-width: 767px) {
-    /* Keep everything on one line for mobile header */
-    flex-direction: row;
-    align-items: center;
-    justify-content: space-between;
-    gap: ${props => props.theme.spacing.xs};
-    flex-wrap: nowrap;
-    
     ${props => props.isSticky && `
-      gap: ${props => props.theme.spacing.xs};
-      padding: ${props.theme.spacing.xs} 0;
+      /* Sticky mobile: everything on one line */
+      flex-direction: row;
       align-items: center;
+      justify-content: space-between;
+      gap: ${props.theme.spacing.xs};
+      flex-wrap: nowrap;
+      padding: ${props.theme.spacing.xs} 0;
       width: 100%;
     `}
     
-    /* Keep form on second line when not sticky */
     ${props => !props.isSticky && `
-      flex-direction: column;
-      align-items: stretch;
-      gap: ${props.theme.spacing.sm};
+      /* Non-sticky mobile: allow wrapping so form goes to next line */
+      flex-direction: row;
+      align-items: center;
+      justify-content: space-between;
+      gap: ${props.theme.spacing.xs};
+      flex-wrap: wrap;
+      margin-bottom: 0;
     `}
   }
   
@@ -154,9 +154,9 @@ const CompactTitle = styled.h1`
     `}
     
     ${props => !props.isSticky && `
-      text-align: center;
-      width: 100%;
-      margin-bottom: ${props.theme.spacing.sm};
+      text-align: left;
+      flex-shrink: 0;
+      margin-bottom: 0;
     `}
   }
   
@@ -217,10 +217,11 @@ const FormContainer = styled.div`
     `}
     
     ${props => !props.isSticky && `
-      /* When not sticky, form takes full width on separate line */
+      /* When not sticky, form takes full width on separate line below the header */
       order: 3;
       width: 100%;
-      margin-top: ${props.theme.spacing.sm};
+      flex-basis: 100%;
+      margin-top: ${props.theme.spacing.lg};
       margin-bottom: 0;
     `}
   }
@@ -272,9 +273,9 @@ const ActionsContainer = styled.div`
     `}
     
     ${props => !props.isSticky && `
-      /* When not sticky, center actions */
-      justify-content: center;
-      width: 100%;
+      /* When not sticky, keep actions on the right side of single line */
+      justify-content: flex-end;
+      flex-shrink: 0;
     `}
   }
   
