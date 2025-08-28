@@ -223,7 +223,7 @@ export const Form = styled.form`
   display: flex;
   flex-direction: row;
   gap: ${props => props.theme.spacing.md};
-  align-items: flex-start;
+  align-items: center;
   
   @media (min-width: 768px) {
     gap: ${props => props.theme.spacing.lg};
