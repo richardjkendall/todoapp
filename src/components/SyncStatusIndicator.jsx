@@ -102,7 +102,7 @@ const SyncStatusIndicator = ({
       case 'syncing':
         return {
           status: 'syncing',
-          text: 'Syncing to cloud...',
+          text: 'Syncing...',
           priority: 'medium'
         }
       case 'synced':

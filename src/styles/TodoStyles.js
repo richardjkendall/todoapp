@@ -127,7 +127,7 @@ export const ContentArea = styled.div`
   margin-top: ${props => props.theme.spacing.lg};
   
   /* Add conditional padding to prevent content from being obscured by sticky header */
-  padding-top: ${props => props.headerIsSticky ? '15px' : '0'};
+  padding-top: ${props => props.headerIsSticky ? props.theme.spacing.xl : '0'};
   transition: padding-top 0.3s ease;
   
   @media (min-width: 768px) {
@@ -221,11 +221,11 @@ export const ActionButton = styled.button`
 
 export const Form = styled.form`
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   gap: ${props => props.theme.spacing.md};
+  align-items: flex-start;
   
   @media (min-width: 768px) {
-    flex-direction: row;
     gap: ${props => props.theme.spacing.lg};
   }
 `
@@ -463,11 +463,14 @@ export const SwipeContainer = styled.div`
   width: 100%;
 `
 
-export const SwipeContent = styled.div`
+export const SwipeContent = styled.div.attrs(props => ({
+  style: {
+    transform: `translateX(${props.offset}px)`,
+    transition: props.isAnimating ? 'transform 0.3s cubic-bezier(0.4, 0.0, 0.2, 1)' : 'none'
+  }
+}))`
   position: relative;
   z-index: 2;
-  transform: translateX(${props => props.offset}px);
-  transition: ${props => props.isAnimating ? 'transform 0.3s cubic-bezier(0.4, 0.0, 0.2, 1)' : 'none'};
   will-change: transform;
   width: 100%;
   display: flex;
