@@ -222,21 +222,39 @@ const TodoItem = ({
     swipeConfig
   )
 
-  // Check if we're on a touch device (regardless of viewport size)
-  const [isTouchDevice, setIsTouchDevice] = useState(false)
+  // Check if touch is the primary input method (mobile/tablet vs desktop)
+  const [isPrimaryTouchDevice, setIsPrimaryTouchDevice] = useState(false)
   
   useEffect(() => {
-    // Detect actual touch capability, not just viewport size
-    const hasTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0 || navigator.msMaxTouchPoints > 0
-    setIsTouchDevice(hasTouch)
+    // More sophisticated detection - check if touch is the primary input method
+    const isTouchPrimary = () => {
+      // First check if touch is available at all
+      const hasTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0 || navigator.msMaxTouchPoints > 0
+      
+      if (!hasTouch) return false
+      
+      // Check for mobile user agents (primary touch devices)
+      const isMobileUA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+      
+      // Check for small screen size (likely mobile/tablet)
+      const isSmallScreen = window.matchMedia('(max-width: 1024px)').matches
+      
+      // Check pointer media query (coarse = touch, fine = mouse)
+      const hasCoarsePointer = window.matchMedia('(pointer: coarse)').matches
+      
+      // Primary touch if: mobile UA OR (small screen AND coarse pointer) OR (has touch AND no fine pointer available)
+      return isMobileUA || (isSmallScreen && hasCoarsePointer) || (hasTouch && !window.matchMedia('(pointer: fine)').matches)
+    }
+    
+    setIsPrimaryTouchDevice(isTouchPrimary())
   }, [])
 
-  // Disable drag and drop on touch devices or during swipe/edit/search
-  const isDragDisabled = isTouchDevice || isEditing || searchActive || (isAnimating && Math.abs(swipeOffset) > 50)
+  // Disable drag and drop on primary touch devices or during swipe/edit/search
+  const isDragDisabled = isPrimaryTouchDevice || isEditing || searchActive || (isAnimating && Math.abs(swipeOffset) > 50)
 
-  // Add non-passive touchmove listener to prevent scroll interference (touch devices only)
+  // Add non-passive touchmove listener to prevent scroll interference (primary touch devices only)
   useEffect(() => {
-    if (!isTouchDevice) return
+    if (!isPrimaryTouchDevice) return
     
     const container = swipeContainerRef.current
     if (!container) return
@@ -250,7 +268,7 @@ const TodoItem = ({
     return () => {
       container.removeEventListener('touchmove', handleTouchMove)
     }
-  }, [touchHandlers, isTouchDevice])
+  }, [touchHandlers, isPrimaryTouchDevice])
 
   return (
     <StyledTodoItem 
@@ -264,12 +282,12 @@ const TodoItem = ({
     >
       <SwipeContainer
         ref={swipeContainerRef}
-        onTouchStart={isTouchDevice ? touchHandlers.onTouchStart : undefined}
-        onTouchEnd={isTouchDevice ? touchHandlers.onTouchEnd : undefined}
-        onTouchCancel={isTouchDevice ? touchHandlers.onTouchCancel : undefined}
+        onTouchStart={isPrimaryTouchDevice ? touchHandlers.onTouchStart : undefined}
+        onTouchEnd={isPrimaryTouchDevice ? touchHandlers.onTouchEnd : undefined}
+        onTouchCancel={isPrimaryTouchDevice ? touchHandlers.onTouchCancel : undefined}
       >
-        {/* Swipe action backgrounds (touch devices only) */}
-        {isTouchDevice && (
+        {/* Swipe action backgrounds (primary touch devices only) */}
+        {isPrimaryTouchDevice && (
           <>
             {/* Right swipe: Complete incomplete todos OR undo completed todos */}
             <SwipeAction 
@@ -342,8 +360,8 @@ const TodoItem = ({
               </>
             )}
           </TodoContent>
-          {/* Show actions only on non-touch devices, or when editing (save/cancel needed even on touch devices) */}
-          {(!isTouchDevice || isEditing) && (
+          {/* Show actions only on non-primary-touch devices, or when editing (save/cancel needed even on touch devices) */}
+          {(!isPrimaryTouchDevice || isEditing) && (
             <TodoActions>
               <ButtonGroup>
                 {isEditing ? (
