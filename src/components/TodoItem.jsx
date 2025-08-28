@@ -222,25 +222,21 @@ const TodoItem = ({
     swipeConfig
   )
 
-  // Check if we're on a mobile device (using media query for more accurate detection)
-  const [isMobileDevice, setIsMobileDevice] = useState(false)
+  // Check if we're on a touch device (regardless of viewport size)
+  const [isTouchDevice, setIsTouchDevice] = useState(false)
   
   useEffect(() => {
-    const mediaQuery = window.matchMedia('(max-width: 767px)')
-    const handleMediaQueryChange = (e) => setIsMobileDevice(e.matches)
-    
-    setIsMobileDevice(mediaQuery.matches)
-    mediaQuery.addListener(handleMediaQueryChange)
-    
-    return () => mediaQuery.removeListener(handleMediaQueryChange)
+    // Detect actual touch capability, not just viewport size
+    const hasTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0 || navigator.msMaxTouchPoints > 0
+    setIsTouchDevice(hasTouch)
   }, [])
 
-  // Disable drag and drop on mobile devices or during swipe/edit/search
-  const isDragDisabled = isMobileDevice || isEditing || searchActive || (isAnimating && Math.abs(swipeOffset) > 50)
+  // Disable drag and drop on touch devices or during swipe/edit/search
+  const isDragDisabled = isTouchDevice || isEditing || searchActive || (isAnimating && Math.abs(swipeOffset) > 50)
 
-  // Add non-passive touchmove listener to prevent scroll interference (mobile only)
+  // Add non-passive touchmove listener to prevent scroll interference (touch devices only)
   useEffect(() => {
-    if (!isMobileDevice) return
+    if (!isTouchDevice) return
     
     const container = swipeContainerRef.current
     if (!container) return
@@ -254,7 +250,7 @@ const TodoItem = ({
     return () => {
       container.removeEventListener('touchmove', handleTouchMove)
     }
-  }, [touchHandlers, isMobileDevice])
+  }, [touchHandlers, isTouchDevice])
 
   return (
     <StyledTodoItem 
@@ -268,12 +264,12 @@ const TodoItem = ({
     >
       <SwipeContainer
         ref={swipeContainerRef}
-        onTouchStart={isMobileDevice ? touchHandlers.onTouchStart : undefined}
-        onTouchEnd={isMobileDevice ? touchHandlers.onTouchEnd : undefined}
-        onTouchCancel={isMobileDevice ? touchHandlers.onTouchCancel : undefined}
+        onTouchStart={isTouchDevice ? touchHandlers.onTouchStart : undefined}
+        onTouchEnd={isTouchDevice ? touchHandlers.onTouchEnd : undefined}
+        onTouchCancel={isTouchDevice ? touchHandlers.onTouchCancel : undefined}
       >
-        {/* Swipe action backgrounds (mobile only) */}
-        {isMobileDevice && (
+        {/* Swipe action backgrounds (touch devices only) */}
+        {isTouchDevice && (
           <>
             {/* Right swipe: Complete incomplete todos OR undo completed todos */}
             <SwipeAction 
@@ -346,8 +342,8 @@ const TodoItem = ({
               </>
             )}
           </TodoContent>
-          {/* Show actions only on desktop, or when editing (save/cancel needed even on mobile) */}
-          {(!isMobileDevice || isEditing) && (
+          {/* Show actions only on non-touch devices, or when editing (save/cancel needed even on touch devices) */}
+          {(!isTouchDevice || isEditing) && (
             <TodoActions>
               <ButtonGroup>
                 {isEditing ? (
