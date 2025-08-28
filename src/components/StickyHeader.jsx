@@ -291,8 +291,22 @@ const StickyHeader = ({ children, actions, forceSticky = false, onStickyChange }
   const { isScrolled } = useScrollSpy(60)
   const [hasBeenSticky, setHasBeenSticky] = useState(false)
   
+  // Check if we're on mobile (using media query)
+  const [isMobile, setIsMobile] = useState(false)
+  
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(max-width: 767px)')
+    const handleMediaQueryChange = (e) => setIsMobile(e.matches)
+    
+    setIsMobile(mediaQuery.matches)
+    mediaQuery.addListener(handleMediaQueryChange)
+    
+    return () => mediaQuery.removeListener(handleMediaQueryChange)
+  }, [])
+
   // Once sticky due to scroll, stay sticky if search is active
-  const shouldBeSticky = isScrolled || (hasBeenSticky && forceSticky)
+  // But on mobile during search, only stay sticky if currently scrolled (allow unsticking when scrolling back up)
+  const shouldBeSticky = isScrolled || (hasBeenSticky && forceSticky && (!isMobile || isScrolled))
   
   useEffect(() => {
     if (isScrolled) {

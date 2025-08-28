@@ -375,14 +375,14 @@ export const Textarea = styled.textarea`
   font-weight: ${props => props.theme.typography.fontWeight.normal};
   line-height: ${props => props.theme.typography.lineHeight.tight};
   resize: none;
-  min-height: 3rem;
+  min-height: 2.5rem;
   
   @media (max-width: 767px) {
     min-height: 4.5rem; /* Taller on mobile to accommodate multi-line placeholder */
   }
   
   @media (min-width: 768px) {
-    min-height: 3rem; /* Keep original height on desktop */
+    min-height: 2.5rem; /* Single-line height on desktop */
   }
   overflow: hidden;
   background-color: ${props => props.theme.colors.card};
