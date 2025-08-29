@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext'
 import { useToastContext } from '../context/ToastContext'
 import GraphService from '../services/graphService'
 import { withErrorHandling, getErrorMessage, logError } from '../utils/oneDriveErrorHandling'
+import { smartSyncResolve, createSmartConflictInfo, filterActiveTodos, cleanupOldTombstones } from '../utils/smartSyncConflictDetection'
 
 /**
  * Core OneDrive operations hook - handles save, load, and conflict resolution
@@ -15,9 +16,66 @@ export const useOneDriveOperations = () => {
   const [error, setError] = useState(null)
   const [conflictInfo, setConflictInfo] = useState(null)
   
-  // Track last saved data to prevent false conflicts
+  // Track last saved data for change detection
   const lastSavedDataRef = useRef(null)
-  const optimisticDataRef = useRef(null)
+  // Track todos that were explicitly deleted locally
+  const deletedTodoIdsRef = useRef(new Set())
+
+  /**
+   * Mark a todo as deleted locally
+   */
+  const markAsDeleted = useCallback((todoId) => {
+    deletedTodoIdsRef.current.add(todoId)
+    console.log(`🗑️ Todo ${todoId} marked as deleted locally`)
+  }, [])
+
+  /**
+   * Clear deletion tracking (after successful sync)
+   */
+  const clearDeletedTracking = useCallback(() => {
+    deletedTodoIdsRef.current.clear()
+    console.log('✅ Cleared deletion tracking after sync')
+  }, [])
+
+  /**
+   * Smart conflict check using timestamps - no complex tracking needed
+   */
+  const checkForRemoteConflicts = useCallback(async (localTodos, graphService) => {
+    try {
+      console.log('🧠 Smart sync conflict check...', {
+        localCount: localTodos.length
+      })
+      
+      // Load current remote state (includes tombstones)
+      const remoteResult = await graphService.readTodos()
+      const allRemoteTodos = remoteResult?.todos || remoteResult || []
+      
+      // If no remote data exists, just use local data
+      if (!allRemoteTodos || allRemoteTodos.length === 0) {
+        console.log('✅ No remote data - using local todos')
+        return { resolved: localTodos }
+      }
+      
+      // Use smart sync resolution with tombstone support
+      const result = smartSyncResolve(localTodos, allRemoteTodos, deletedTodoIdsRef.current)
+      
+      if (result.hasConflicts) {
+        console.log(`⚠️ Found ${result.conflicts.length} true simultaneous conflicts`)
+        return {
+          conflicts: createSmartConflictInfo(result.conflicts, localTodos, allRemoteTodos)
+        }
+      } else {
+        console.log(`✅ Smart sync complete - resolved ${result.resolved.length} todos automatically`)
+        return {
+          resolved: result.resolved
+        }
+      }
+      
+    } catch (error) {
+      console.error('Error in smart sync check:', error)
+      throw new Error(`Smart sync failed: ${error.message}`)
+    }
+  }, [])
 
   // Create graph service instance
   const createGraphService = useCallback(() => {
@@ -42,11 +100,27 @@ export const useOneDriveOperations = () => {
         const graphService = createGraphService()
         if (!graphService) throw new Error('Unable to create Graph service')
 
-        await graphService.writeTodos(todos)
+        // Smart sync with timestamp-based conflict detection
+        console.log('🧠 Smart sync before save...', { todosCount: todos.length })
+        const syncResult = await checkForRemoteConflicts(todos, graphService)
         
-        // Update tracking data
-        lastSavedDataRef.current = todos
-        optimisticDataRef.current = null
+        if (syncResult?.conflicts) {
+          console.log('⚠️ True conflicts detected - simultaneous edits need resolution')
+          setConflictInfo(syncResult.conflicts)
+          return null // Don't save, let user resolve conflicts first
+        }
+
+        // Use auto-resolved todos from smart sync (includes both active todos and tombstones)
+        let todosToSave = syncResult?.resolved || todos
+        
+        // Clean up old tombstones before saving
+        todosToSave = cleanupOldTombstones(todosToSave)
+        
+        await graphService.writeTodos(todosToSave)
+        
+        // Update tracking data and clear deletion tracking after successful sync
+        lastSavedDataRef.current = todosToSave
+        clearDeletedTracking() // Clear deletion tracking since it's now synced
         
         if (showToast) {
           showSuccess('Synced successfully to OneDrive')
@@ -100,13 +174,19 @@ export const useOneDriveOperations = () => {
         const result = await graphService.readTodos()
         
         // Handle new return format with metadata
-        const todos = result.todos || result || []
+        const allTodos = result.todos || result || []
         const lastModified = result.lastModified || null
         
-        // Update tracking data
-        lastSavedDataRef.current = todos
+        // Separate active todos from tombstones
+        const activeTodos = filterActiveTodos(allTodos)
         
-        return { todos, lastModified }
+        // Update tracking data with ALL todos (including tombstones for sync)
+        lastSavedDataRef.current = allTodos
+        
+        console.log(`📥 Loaded: ${activeTodos.length} active todos, ${allTodos.length - activeTodos.length} tombstones`)
+        
+        // Return only active todos for the UI
+        return { todos: activeTodos, lastModified }
       } catch (err) {
         logError(err, 'load')
         
@@ -137,7 +217,8 @@ export const useOneDriveOperations = () => {
       const graphService = createGraphService()
       if (!graphService) return null
 
-      const remoteTodos = await graphService.readTodos()
+      const remoteResult = await graphService.readTodos()
+      const remoteTodos = remoteResult?.todos || remoteResult || []
       
       return {
         local: localTodos,
@@ -266,12 +347,17 @@ export const useOneDriveOperations = () => {
     migrateToOneDrive,
     rollbackOptimisticChanges,
     
+    // Deletion tracking
+    markAsDeleted,
+    clearDeletedTracking,
+    
     // State
     isLoading,
     error,
     conflictInfo,
     
     // Utilities
-    hasDataChanged
+    hasDataChanged,
+    createGraphService
   }
 }
