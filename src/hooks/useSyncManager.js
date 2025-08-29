@@ -195,6 +195,9 @@ export const useSyncManager = (isOneDriveMode) => {
     migrateToOneDrive: oneDriveOps.migrateToOneDrive,
     rollbackOptimisticChanges: oneDriveOps.rollbackOptimisticChanges,
     hasDataChanged: oneDriveOps.hasDataChanged,
+    markAsDeleted: oneDriveOps.markAsDeleted,
+    clearDeletedTracking: oneDriveOps.clearDeletedTracking,
+    createGraphService: oneDriveOps.createGraphService,
     
     // State
     syncStatus,

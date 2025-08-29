@@ -1,11 +1,12 @@
 import { useCallback } from 'react'
 import { createTodo, isValidTodo, normalizeTodo } from '../utils/todoValidation'
 import { useTodoTextParser } from './useTodoTextParser'
+import { touchTodo } from '../utils/smartSyncConflictDetection'
 
 /**
  * Hook for todo CRUD operations
  */
-export const useTodoOperations = (todos, setTodos, onUserChange) => {
+export const useTodoOperations = (todos, setTodos, onUserChange, onTodoDeleted) => {
   const { extractTagsAndText } = useTodoTextParser()
 
   /**
@@ -19,7 +20,7 @@ export const useTodoOperations = (todos, setTodos, onUserChange) => {
       order: 0 // New todos start at top of their priority group
     })
     setTodos([newTodo, ...todos])
-    onUserChange()
+    onUserChange(newTodo.id)
   }, [extractTagsAndText, setTodos, todos, onUserChange])
 
   /**
@@ -27,9 +28,9 @@ export const useTodoOperations = (todos, setTodos, onUserChange) => {
    */
   const toggleComplete = useCallback((id) => {
     setTodos(todos.map(todo => 
-      todo.id === id ? { ...todo, completed: !todo.completed } : todo
+      todo.id === id ? touchTodo({ ...todo, completed: !todo.completed }) : todo
     ))
-    onUserChange()
+    onUserChange(id)
   }, [todos, setTodos, onUserChange])
 
   /**
@@ -38,9 +39,9 @@ export const useTodoOperations = (todos, setTodos, onUserChange) => {
   const editTodo = useCallback((id, newText) => {
     const { text, tags, priority } = extractTagsAndText(newText)
     setTodos(todos.map(todo => 
-      todo.id === id ? { ...todo, text, tags, priority } : todo
+      todo.id === id ? touchTodo({ ...todo, text, tags, priority }) : todo
     ))
-    onUserChange()
+    onUserChange(id)
   }, [extractTagsAndText, todos, setTodos, onUserChange])
 
   /**
@@ -48,8 +49,13 @@ export const useTodoOperations = (todos, setTodos, onUserChange) => {
    */
   const deleteTodo = useCallback((id) => {
     setTodos(todos.filter(todo => todo.id !== id))
-    onUserChange()
-  }, [todos, setTodos, onUserChange])
+    // Mark as deleted for sync tracking
+    if (onTodoDeleted) {
+      onTodoDeleted(id)
+    } else {
+      onUserChange()
+    }
+  }, [todos, setTodos, onUserChange, onTodoDeleted])
 
   /**
    * Remove a specific tag from a todo

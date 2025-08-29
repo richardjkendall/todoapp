@@ -38,10 +38,14 @@ export const useEnhancedOneDriveStorage = () => {
 
     // Sync operations
     saveToOneDrive,
+    saveImmediately: syncManager.saveImmediately,
     loadFromOneDrive,
     resolveConflict: syncManager.resolveConflict,
     migrateToOneDrive: syncManager.migrateToOneDrive,
     rollbackOptimisticChanges: syncManager.rollbackOptimisticChanges,
+    markAsDeleted: syncManager.markAsDeleted,
+    clearDeletedTracking: syncManager.clearDeletedTracking,
+    createGraphService: syncManager.createGraphService,
 
     // State
     syncStatus: syncManager.syncStatus,

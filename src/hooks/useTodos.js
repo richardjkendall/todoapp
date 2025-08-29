@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext'
 import { useTodoOperations } from './useTodoOperations'
 import { useTodoSearch } from './useTodoSearch'
 import { useTodoTextParser } from './useTodoTextParser'
+import { smartMergeTodos, createConflictInfo } from '../utils/conflictDetection'
 
 /**
  * Main todos hook - simplified by composing focused sub-hooks
@@ -25,19 +26,18 @@ const useTodos = () => {
     localStorage.setItem('lastLocalModified', Date.now().toString())
   }, [])
   
-  // Initialize focused sub-hooks
-  const operations = useTodoOperations(todos, setTodos, onUserChange)
-  const search = useTodoSearch(todos)
-  const textParser = useTodoTextParser()
-  
   // OneDrive storage (always enabled since we simplified storage choice)
   const oneDriveStorage = useEnhancedOneDriveStorage()
   const {
     saveToOneDrive,
+    saveImmediately,
     loadFromOneDrive,
     resolveConflict,
     migrateToOneDrive,
     rollbackOptimisticChanges,
+    markAsDeleted,
+    clearDeletedTracking,
+    createGraphService,
     syncStatus,
     lastSyncTime,
     isLoading,
@@ -46,6 +46,24 @@ const useTodos = () => {
     isOnline,
     queueStatus
   } = oneDriveStorage
+
+  // Simple callback for user changes - no complex tracking needed
+  const onTodoModified = useCallback((todoId) => {
+    onUserChange()
+  }, [onUserChange])
+
+  // Callback for when todo is deleted
+  const onTodoDeleted = useCallback((todoId) => {
+    if (markAsDeleted) {
+      markAsDeleted(todoId)
+    }
+    onUserChange()
+  }, [markAsDeleted, onUserChange])
+  
+  // Initialize focused sub-hooks  
+  const operations = useTodoOperations(todos, setTodos, onTodoModified, onTodoDeleted)
+  const search = useTodoSearch(todos)
+  const textParser = useTodoTextParser()
 
   // Local conflict state to handle conflicts detected during comparison
   const [localConflictInfo, setLocalConflictInfo] = useState(null)
@@ -65,8 +83,15 @@ const useTodos = () => {
         const parsed = JSON.parse(savedTodos)
         if (Array.isArray(parsed)) {
           const cleaned = cleanupTodos(parsed)
-          setTodos(cleaned)
-          return cleaned
+          // Filter out tombstones from localStorage - they should never be in the UI
+          const activeTodos = cleaned.filter(todo => !todo.deleted)
+          setTodos(activeTodos)
+          // Re-save localStorage without tombstones to clean it up
+          if (activeTodos.length !== cleaned.length) {
+            localStorage.setItem('todos', JSON.stringify(activeTodos))
+            console.log(`🧹 Cleaned up ${cleaned.length - activeTodos.length} tombstones from localStorage`)
+          }
+          return activeTodos
         }
       }
       return []
@@ -108,44 +133,72 @@ const useTodos = () => {
       // Load from OneDrive to check for any existing data
       console.log('Loading from OneDrive...')
       const oneDriveResult = await loadFromOneDrive()
-      const oneDriveTodos = oneDriveResult?.todos || oneDriveResult || []
+      const oneDriveActiveTodos = oneDriveResult?.todos || oneDriveResult || []
       const oneDriveLastModified = oneDriveResult?.lastModified || null
+      
+      // Also load complete OneDrive data (including tombstones) for smart sync
+      const graphService = createGraphService ? createGraphService() : null
+      let oneDriveCompleteTodos = []
+      if (graphService) {
+        try {
+          const completeResult = await graphService.readTodos()
+          oneDriveCompleteTodos = completeResult?.todos || completeResult || []
+          console.log(`📊 OneDrive complete data: ${oneDriveCompleteTodos.length} total (${oneDriveActiveTodos.length} active)`)
+        } catch (error) {
+          console.error('Failed to load complete OneDrive data:', error)
+          oneDriveCompleteTodos = oneDriveActiveTodos // Fallback to active todos only
+        }
+      } else {
+        oneDriveCompleteTodos = oneDriveActiveTodos // Fallback if no graph service
+      }
+      
       const currentLocalTodos = todos // Use current todos state, not loadTodos()
       
-      console.log('OneDrive todos:', oneDriveTodos?.length || 0, 'Local todos:', currentLocalTodos?.length || 0)
+      console.log('OneDrive todos:', oneDriveActiveTodos?.length || 0, 'Local todos:', currentLocalTodos?.length || 0)
       
-      if (oneDriveTodos && oneDriveTodos.length > 0) {
-        // OneDrive has data - compare with current local data
-        const localDataString = JSON.stringify(currentLocalTodos)
-        const oneDriveDataString = JSON.stringify(oneDriveTodos)
-        
-        if (localDataString !== oneDriveDataString) {
-          if (currentLocalTodos.length === 0) {
-            // Local is empty, use OneDrive data
-            console.log('Local empty, loading OneDrive data')
-            setIsSyncing(true)
-            setTodos(oneDriveTodos)
-            localStorage.setItem('todos', JSON.stringify(oneDriveTodos))
-            setIsSyncing(false)
-          } else {
-            // Both have data but they're different - trigger conflict resolution
-            console.log('Conflict detected - both local and OneDrive have different data')
-            // Set conflict info to trigger the modal
-            // Get last local modification time
-            const lastLocalModified = localStorage.getItem('lastLocalModified')
-            const localModified = lastLocalModified ? parseInt(lastLocalModified) : Date.now()
-            
-            setLocalConflictInfo({
-              local: currentLocalTodos,
-              remote: oneDriveTodos,
-              localModified: localModified,
-              remoteModified: oneDriveLastModified || Date.now(), // Use actual OneDrive modification time
-              timestamp: Date.now()
-            })
-            return
-          }
+      if (oneDriveActiveTodos && oneDriveActiveTodos.length > 0) {
+        // OneDrive has data - use smart merge to detect real conflicts
+        if (currentLocalTodos.length === 0) {
+          // Local is empty, use OneDrive data
+          console.log('Local empty, loading OneDrive data')
+          setIsSyncing(true)
+          setTodos(oneDriveActiveTodos)
+          localStorage.setItem('todos', JSON.stringify(oneDriveActiveTodos))
+          setIsSyncing(false)
         } else {
-          console.log('Local and OneDrive data are identical - no sync needed')
+          // Both have data - perform smart sync
+          console.log('Performing smart sync of local and OneDrive data')
+          const { smartSyncResolve, createSmartConflictInfo } = await import('../utils/smartSyncConflictDetection')
+          const syncResult = smartSyncResolve(currentLocalTodos, oneDriveCompleteTodos)
+          
+          console.log('Smart sync result:', syncResult.summary)
+          
+          if (syncResult.hasConflicts) {
+            // True simultaneous conflicts - show resolution UI
+            console.log('Simultaneous edit conflicts detected:', syncResult.conflicts.length)
+            
+            setLocalConflictInfo(createSmartConflictInfo(
+              syncResult.conflicts,
+              currentLocalTodos,
+              oneDriveCompleteTodos
+            ))
+            return
+          } else {
+            // No conflicts - apply smart sync result
+            console.log(`Smart sync successful: ${syncResult.autoResolved} auto-resolved`)
+            setIsSyncing(true)
+            
+            // Filter out tombstones before setting to UI state
+            const { filterActiveTodos } = await import('../utils/smartSyncConflictDetection')
+            const activeTodos = filterActiveTodos(syncResult.resolved)
+            
+            setTodos(activeTodos)
+            localStorage.setItem('todos', JSON.stringify(activeTodos))
+            
+            // Save smart sync result back to OneDrive to ensure consistency (includes tombstones)
+            saveToOneDrive(syncResult.resolved, false)
+            setIsSyncing(false)
+          }
         }
       } else {
         // OneDrive is empty, migrate local data if it exists
@@ -167,55 +220,86 @@ const useTodos = () => {
   }, [isAuthenticated, isLoaded, todos, migrateToOneDrive, loadFromOneDrive])
 
   /**
-   * Handle conflict resolution
+   * Handle conflict resolution for new simplified system
    */
   const handleConflictResolution = useCallback(async (resolution, selectedTodos) => {
     try {
-      // Handle local conflicts detected during comparison
-      if (localConflictInfo) {
-        let resolvedTodos = []
+      // Handle conflicts from new smart sync system
+      if (localConflictInfo && localConflictInfo.type === 'smart-sync-conflict') {
+        console.log('🧠 Resolving smart sync conflicts:', resolution)
         
-        switch (resolution) {
-          case 'local':
-          case 'use_local':
-            resolvedTodos = localConflictInfo.local
-            break
-          case 'remote':
-          case 'use_remote':
-            resolvedTodos = localConflictInfo.remote
-            break
-          case 'merge':
-            resolvedTodos = selectedTodos || []
-            break
-          default:
-            throw new Error(`Invalid conflict resolution option: ${resolution}`)
+        // Start with the resolved todos from the conflict detection
+        let finalTodos = [...(localConflictInfo.local || todos)]
+        const conflictIds = new Set()
+        
+        // Process each conflict based on resolution choice
+        for (const conflict of localConflictInfo.conflicts) {
+          conflictIds.add(conflict.id)
+          
+          let resolvedTodo
+          switch (resolution) {
+            case 'local':
+            case 'use_local':
+              resolvedTodo = conflict.local
+              console.log(`Using local version for todo ${conflict.id}: "${conflict.local.text}"`)
+              break
+            case 'remote':
+            case 'use_remote':
+              resolvedTodo = conflict.remote
+              console.log(`Using remote version for todo ${conflict.id}: "${conflict.remote.text}"`)
+              break
+            case 'merge':
+            case 'field-based':
+              // For simplified system, selectedTodos should contain resolved todos
+              resolvedTodo = selectedTodos?.find(t => t.id === conflict.id) || conflict.local
+              console.log(`Using merged version for todo ${conflict.id}: "${resolvedTodo.text}"`)
+              break
+            default:
+              throw new Error(`Invalid conflict resolution option: ${resolution}`)
+          }
+          
+          // Replace the todo in finalTodos
+          finalTodos = finalTodos.map(todo => 
+            todo.id === conflict.id ? resolvedTodo : todo
+          )
         }
         
-        // Update state and save to both localStorage and OneDrive
+        // Update state first
         setIsSyncing(true)
-        setTodos(resolvedTodos)
-        localStorage.setItem('todos', JSON.stringify(resolvedTodos))
-        await saveToOneDrive(resolvedTodos, false) // Force sync the resolved data
-        setLocalConflictInfo(null) // Clear conflict
+        setTodos(finalTodos)
+        localStorage.setItem('todos', JSON.stringify(finalTodos))
+        
+        // Save resolved todos directly - smart sync won't re-conflict since we resolved them
+        try {
+          await saveImmediately(finalTodos, false) // Use immediate save to bypass smart sync checks
+          console.log('✅ Smart sync conflict resolution saved successfully')
+        } catch (error) {
+          console.error('❌ Failed to save smart sync resolution:', error)
+          throw error
+        }
+        
+        setLocalConflictInfo(null) // Clear conflict state
         setIsSyncing(false)
         
-        return resolvedTodos
+        return finalTodos
       }
       
       // Handle conflicts from OneDrive operations
       if (resolveConflict) {
         const resolvedTodos = await resolveConflict(resolution, selectedTodos)
         if (resolvedTodos) {
-          setTodos(resolvedTodos)
-          localStorage.setItem('todos', JSON.stringify(resolvedTodos))
-          return resolvedTodos
+          // Filter out tombstones from conflict resolution result
+          const activeTodos = resolvedTodos.filter(todo => !todo.deleted)
+          setTodos(activeTodos)
+          localStorage.setItem('todos', JSON.stringify(activeTodos))
+          return activeTodos
         }
       }
     } catch (error) {
       console.error('Conflict resolution failed:', error)
       throw error
     }
-  }, [resolveConflict, localConflictInfo, saveToOneDrive])
+  }, [resolveConflict, localConflictInfo, saveImmediately, todos])
 
   /**
    * Enhanced migration function
@@ -223,9 +307,11 @@ const useTodos = () => {
   const handleMigration = useCallback(async (localTodos) => {
     try {
       const migratedTodos = await migrateToOneDrive(localTodos)
-      setTodos(migratedTodos)
-      localStorage.setItem('todos', JSON.stringify(migratedTodos))
-      return migratedTodos
+      // Filter out any tombstones that might have been included
+      const activeTodos = migratedTodos.filter(todo => !todo.deleted)
+      setTodos(activeTodos)
+      localStorage.setItem('todos', JSON.stringify(activeTodos))
+      return activeTodos
     } catch (error) {
       console.error('Migration failed:', error)
       throw error
