@@ -93,7 +93,7 @@ const Footer = () => {
           We <HeartIcon>♥</HeartIcon> open source
         </FooterText>
         <FooterLink 
-          href="https://github.com/richardjkendall/longlist" 
+          href="https://github.com/richardjkendall/todoapp" 
           target="_blank" 
           rel="noopener noreferrer"
           aria-label="View LongList source code on GitHub"
