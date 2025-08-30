@@ -101,3 +101,25 @@ export const SignOutIcon = (props) => (
     <line x1="21" y1="12" x2="9" y2="12" />
   </IconBase>
 )
+
+export const WarningIcon = (props) => (
+  <IconBase {...props} viewBox="0 0 24 24">
+    <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
+    <path d="M12 9v4" />
+    <path d="M12 17h.01" />
+  </IconBase>
+)
+
+export const InfoIcon = (props) => (
+  <IconBase {...props} viewBox="0 0 24 24">
+    <circle cx="12" cy="12" r="10" />
+    <path d="M12 16v-4" />
+    <path d="M12 8h.01" />
+  </IconBase>
+)
+
+export const CloudIcon = (props) => (
+  <IconBase {...props} viewBox="0 0 24 24">
+    <path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z" />
+  </IconBase>
+)

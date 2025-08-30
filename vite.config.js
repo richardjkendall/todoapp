@@ -26,9 +26,9 @@ export default defineConfig({
       },
       includeAssets: ['favicon.svg', 'apple-touch-icon.png', 'masked-icon.svg'],
       manifest: {
-        name: 'Todo List',
-        short_name: 'TodoList',
-        description: 'A modern todo list app with OneDrive sync',
+        name: 'LongList',
+        short_name: 'LongList',
+        description: 'LongList - A modern task management app with OneDrive sync',
         theme_color: '#4F46E5',
         background_color: '#1E1E1E',
         display: 'standalone',

@@ -12,6 +12,7 @@ import StickyHeader from './components/StickyHeader'
 import SyncStatus from './components/SyncStatus'
 import ConflictResolution from './components/ConflictResolution'
 import OfflineIndicator from './components/OfflineIndicator'
+import LocalStorageWarning from './components/LocalStorageWarning'
 import { 
   GlobalStyle, 
   Container, 
@@ -79,6 +80,8 @@ const AppContent = () => {
             searchActive={searchActive}
           />
         </StickyHeader>
+        
+        <LocalStorageWarning hasTodos={allTodos.length > 0} />
         
         {searchActive && (
           <SearchIndicator isEmpty={todos.length === 0}>

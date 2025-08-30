@@ -355,7 +355,7 @@ const StickyHeader = ({ children, actions, forceSticky = false, onStickyChange }
       <StickyPlaceholder ref={placeholderRef} />
       <StickyContent ref={contentRef} isSticky={shouldBeSticky} theme={enhancedTheme}>
         <CompactHeader isSticky={shouldBeSticky}>
-          <CompactTitle isSticky={shouldBeSticky}>Todo List</CompactTitle>
+          <CompactTitle isSticky={shouldBeSticky}>LongList</CompactTitle>
           <ActionsContainer isSticky={shouldBeSticky}>
             {actions}
           </ActionsContainer>
