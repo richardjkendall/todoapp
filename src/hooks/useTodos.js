@@ -185,7 +185,7 @@ const useTodos = () => {
             return
           } else {
             // No conflicts - apply smart sync result
-            console.log(`Smart sync successful: ${syncResult.autoResolved} auto-resolved`)
+            console.log(`Smart sync successful: ${syncResult.summary.activeTodos} active todos, ${syncResult.summary.tombstones} tombstones, ${syncResult.summary.conflicts} conflicts`)
             setIsSyncing(true)
             
             // Filter out tombstones before setting to UI state

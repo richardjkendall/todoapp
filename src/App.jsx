@@ -4,6 +4,7 @@ import TodoForm from './components/TodoForm'
 import TodoList from './components/TodoList'
 import useTodos from './hooks/useTodos'
 import { ThemeProvider, useTheme } from './context/ThemeContext'
+import { useAuth } from './context/AuthContext'
 import { AuthProvider } from './context/AuthContext'
 import { ToastProvider, ToastRenderer } from './context/ToastContext'
 import { SearchIcon } from './components/Icons'
@@ -12,6 +13,11 @@ import StickyHeader from './components/StickyHeader'
 import SyncStatus from './components/SyncStatus'
 import ConflictResolution from './components/ConflictResolution'
 import OfflineIndicator from './components/OfflineIndicator'
+import LocalStorageWarning from './components/LocalStorageWarning'
+import WelcomeScreen from './components/WelcomeScreen'
+import Footer from './components/Footer'
+import SharedTodoModal from './components/SharedTodoModal'
+import { useSharedTodo } from './hooks/useSharedTodo'
 import { 
   GlobalStyle, 
   Container, 
@@ -22,8 +28,12 @@ import {
 
 const AppContent = () => {
   const { isDark } = useTheme()
+  const { isAuthenticated } = useAuth()
   const theme = getTheme(isDark)
   const [headerIsSticky, setHeaderIsSticky] = useState(false)
+  
+  // Handle shared todos from URLs
+  const { sharedTodo, clearSharedTodo, acceptSharedTodo } = useSharedTodo()
   
   const {
     todos,
@@ -47,6 +57,21 @@ const AppContent = () => {
     isOnline,
     queueStatus
   } = useTodos()
+
+  // Handle shared todo actions
+  const handleAcceptSharedTodo = () => {
+    const todo = acceptSharedTodo()
+    if (todo) {
+      // Reconstruct the todo text with tags and priority
+      const todoText = reconstructTextWithTags(todo.text, todo.tags || [], todo.priority)
+      // Add the shared todo to the list
+      addTodo(todoText)
+    }
+  }
+
+  const handleDeclineSharedTodo = () => {
+    clearSharedTodo()
+  }
 
   return (
     <StyledThemeProvider theme={theme}>
@@ -80,6 +105,9 @@ const AppContent = () => {
           />
         </StickyHeader>
         
+        {/* Only show warning if user has todos but isn't authenticated */}
+        {!isAuthenticated && allTodos.length > 0 && <LocalStorageWarning />}
+        
         {searchActive && (
           <SearchIndicator isEmpty={todos.length === 0}>
             <SearchIcon />
@@ -91,21 +119,27 @@ const AppContent = () => {
         )}
         
         <ContentArea headerIsSticky={headerIsSticky}>
-          <TodoList 
-            todos={todos}
-            allTodos={allTodos}
-            onToggleComplete={toggleComplete}
-            onEditTodo={editTodo}
-            onRemoveTag={removeTag}
-            onDeleteTodo={deleteTodo}
-            onReorderTodos={reorderTodos}
-            extractTagsAndText={extractTagsAndText}
-            reconstructTextWithTags={reconstructTextWithTags}
-            formatTimestamp={formatTimestamp}
-            searchActive={searchActive}
-          />
+          {!isAuthenticated && allTodos.length === 0 ? (
+            <WelcomeScreen />
+          ) : (
+            <TodoList 
+              todos={todos}
+              allTodos={allTodos}
+              onToggleComplete={toggleComplete}
+              onEditTodo={editTodo}
+              onRemoveTag={removeTag}
+              onDeleteTodo={deleteTodo}
+              onReorderTodos={reorderTodos}
+              extractTagsAndText={extractTagsAndText}
+              reconstructTextWithTags={reconstructTextWithTags}
+              formatTimestamp={formatTimestamp}
+              searchActive={searchActive}
+            />
+          )}
         </ContentArea>
       </Container>
+
+      <Footer />
 
       {/* Conflict Resolution Modal */}
       {conflictInfo && (
@@ -113,6 +147,15 @@ const AppContent = () => {
           conflictInfo={conflictInfo}
           onResolve={handleConflictResolution}
           isLoading={syncStatus === 'syncing'}
+        />
+      )}
+      
+      {/* Shared Todo Modal */}
+      {sharedTodo && (
+        <SharedTodoModal
+          sharedTodo={sharedTodo}
+          onAccept={handleAcceptSharedTodo}
+          onDecline={handleDeclineSharedTodo}
         />
       )}
       
