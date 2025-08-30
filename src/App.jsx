@@ -4,6 +4,7 @@ import TodoForm from './components/TodoForm'
 import TodoList from './components/TodoList'
 import useTodos from './hooks/useTodos'
 import { ThemeProvider, useTheme } from './context/ThemeContext'
+import { useAuth } from './context/AuthContext'
 import { AuthProvider } from './context/AuthContext'
 import { ToastProvider, ToastRenderer } from './context/ToastContext'
 import { SearchIcon } from './components/Icons'
@@ -13,6 +14,8 @@ import SyncStatus from './components/SyncStatus'
 import ConflictResolution from './components/ConflictResolution'
 import OfflineIndicator from './components/OfflineIndicator'
 import LocalStorageWarning from './components/LocalStorageWarning'
+import WelcomeScreen from './components/WelcomeScreen'
+import Footer from './components/Footer'
 import { 
   GlobalStyle, 
   Container, 
@@ -23,6 +26,7 @@ import {
 
 const AppContent = () => {
   const { isDark } = useTheme()
+  const { isAuthenticated } = useAuth()
   const theme = getTheme(isDark)
   const [headerIsSticky, setHeaderIsSticky] = useState(false)
   
@@ -81,7 +85,8 @@ const AppContent = () => {
           />
         </StickyHeader>
         
-        <LocalStorageWarning hasTodos={allTodos.length > 0} />
+        {/* Only show warning if user has todos but isn't authenticated */}
+        {!isAuthenticated && allTodos.length > 0 && <LocalStorageWarning />}
         
         {searchActive && (
           <SearchIndicator isEmpty={todos.length === 0}>
@@ -94,21 +99,27 @@ const AppContent = () => {
         )}
         
         <ContentArea headerIsSticky={headerIsSticky}>
-          <TodoList 
-            todos={todos}
-            allTodos={allTodos}
-            onToggleComplete={toggleComplete}
-            onEditTodo={editTodo}
-            onRemoveTag={removeTag}
-            onDeleteTodo={deleteTodo}
-            onReorderTodos={reorderTodos}
-            extractTagsAndText={extractTagsAndText}
-            reconstructTextWithTags={reconstructTextWithTags}
-            formatTimestamp={formatTimestamp}
-            searchActive={searchActive}
-          />
+          {!isAuthenticated && allTodos.length === 0 ? (
+            <WelcomeScreen />
+          ) : (
+            <TodoList 
+              todos={todos}
+              allTodos={allTodos}
+              onToggleComplete={toggleComplete}
+              onEditTodo={editTodo}
+              onRemoveTag={removeTag}
+              onDeleteTodo={deleteTodo}
+              onReorderTodos={reorderTodos}
+              extractTagsAndText={extractTagsAndText}
+              reconstructTextWithTags={reconstructTextWithTags}
+              formatTimestamp={formatTimestamp}
+              searchActive={searchActive}
+            />
+          )}
         </ContentArea>
       </Container>
+
+      <Footer />
 
       {/* Conflict Resolution Modal */}
       {conflictInfo && (
