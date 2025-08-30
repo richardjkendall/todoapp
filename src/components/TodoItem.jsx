@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import Tag from './Tag'
+import ShareButton from './ShareButton'
 import { EditIcon, CheckIcon, UndoIcon, DeleteIcon, SaveIcon, CancelIcon } from './Icons'
 import { 
   TodoItem as StyledTodoItem, 
@@ -360,7 +361,7 @@ const TodoItem = ({
               </>
             )}
           </TodoContent>
-          {/* Show actions only on non-primary-touch devices, or when editing (save/cancel needed even on touch devices) */}
+          {/* Show edit/delete/complete actions based on device type and editing state */}
           {(!isPrimaryTouchDevice || isEditing) && (
             <TodoActions>
               <ButtonGroup>
@@ -385,6 +386,15 @@ const TodoItem = ({
                     </CompleteButton>
                   </>
                 )}
+              </ButtonGroup>
+            </TodoActions>
+          )}
+          
+          {/* Always show share button - essential for mobile sharing since both swipe directions are used */}
+          {!isEditing && (
+            <TodoActions>
+              <ButtonGroup>
+                <ShareButton todo={todo} />
               </ButtonGroup>
             </TodoActions>
           )}

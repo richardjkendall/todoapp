@@ -16,6 +16,8 @@ import OfflineIndicator from './components/OfflineIndicator'
 import LocalStorageWarning from './components/LocalStorageWarning'
 import WelcomeScreen from './components/WelcomeScreen'
 import Footer from './components/Footer'
+import SharedTodoModal from './components/SharedTodoModal'
+import { useSharedTodo } from './hooks/useSharedTodo'
 import { 
   GlobalStyle, 
   Container, 
@@ -29,6 +31,9 @@ const AppContent = () => {
   const { isAuthenticated } = useAuth()
   const theme = getTheme(isDark)
   const [headerIsSticky, setHeaderIsSticky] = useState(false)
+  
+  // Handle shared todos from URLs
+  const { sharedTodo, clearSharedTodo, acceptSharedTodo } = useSharedTodo()
   
   const {
     todos,
@@ -52,6 +57,21 @@ const AppContent = () => {
     isOnline,
     queueStatus
   } = useTodos()
+
+  // Handle shared todo actions
+  const handleAcceptSharedTodo = () => {
+    const todo = acceptSharedTodo()
+    if (todo) {
+      // Reconstruct the todo text with tags and priority
+      const todoText = reconstructTextWithTags(todo.text, todo.tags || [], todo.priority)
+      // Add the shared todo to the list
+      addTodo(todoText)
+    }
+  }
+
+  const handleDeclineSharedTodo = () => {
+    clearSharedTodo()
+  }
 
   return (
     <StyledThemeProvider theme={theme}>
@@ -127,6 +147,15 @@ const AppContent = () => {
           conflictInfo={conflictInfo}
           onResolve={handleConflictResolution}
           isLoading={syncStatus === 'syncing'}
+        />
+      )}
+      
+      {/* Shared Todo Modal */}
+      {sharedTodo && (
+        <SharedTodoModal
+          sharedTodo={sharedTodo}
+          onAccept={handleAcceptSharedTodo}
+          onDecline={handleDeclineSharedTodo}
         />
       )}
       

@@ -129,3 +129,44 @@ export const GitHubIcon = (props) => (
     <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22" />
   </IconBase>
 )
+
+export const ShareIcon = (props) => (
+  <IconBase {...props} viewBox="0 0 24 24">
+    <circle cx="18" cy="5" r="3" />
+    <circle cx="6" cy="12" r="3" />
+    <circle cx="18" cy="19" r="3" />
+    <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
+    <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
+  </IconBase>
+)
+
+export const CopyIcon = (props) => (
+  <IconBase {...props} viewBox="0 0 24 24">
+    <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
+    <path d="m4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
+  </IconBase>
+)
+
+export const EmailIcon = (props) => (
+  <IconBase {...props} viewBox="0 0 24 24">
+    <rect width="20" height="16" x="2" y="4" rx="2" />
+    <path d="m22 7-10 5L2 7" />
+  </IconBase>
+)
+
+export const QRIcon = (props) => (
+  <IconBase {...props} viewBox="0 0 24 24">
+    <rect width="5" height="5" x="3" y="3" rx="1" />
+    <rect width="5" height="5" x="16" y="3" rx="1" />
+    <rect width="5" height="5" x="3" y="16" rx="1" />
+    <path d="M21 16h-3a2 2 0 0 0-2 2v3" />
+    <path d="M21 21v.01" />
+    <path d="M12 7v3a2 2 0 0 1-2 2H7" />
+    <path d="M3 12h.01" />
+    <path d="M12 3h.01" />
+    <path d="M12 16v.01" />
+    <path d="M16 12h1" />
+    <path d="M21 12v.01" />
+    <path d="M12 21v-1" />
+  </IconBase>
+)

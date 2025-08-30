@@ -57,6 +57,8 @@ const Modal = styled.div`
   justify-content: center;
   z-index: 10000;
   padding: ${props => props.theme.spacing.md};
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
 `
 
 const ModalContent = styled.div`
