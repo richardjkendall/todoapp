@@ -14,11 +14,19 @@ export const useTodoOperations = (todos, setTodos, onUserChange, onTodoDeleted) 
    */
   const addTodo = useCallback((inputText) => {
     const { text, tags, priority } = extractTagsAndText(inputText)
+    
+    // Find the minimum order value among existing todos in the same priority group
+    // and set new todo to one less to ensure it appears at the top
+    const samePriorityTodos = todos.filter(todo => !todo.completed && todo.priority === priority)
+    const minOrder = samePriorityTodos.length > 0 ? Math.min(...samePriorityTodos.map(t => t.order || 0)) : 0
+    const newTodoOrder = minOrder - 1
+    
     const newTodo = createTodo(text, { 
       tags, 
       priority, 
-      order: 0 // New todos start at top of their priority group
+      order: newTodoOrder // Ensure this is smaller than any existing order
     })
+    
     setTodos([newTodo, ...todos])
     onUserChange(newTodo.id)
   }, [extractTagsAndText, setTodos, todos, onUserChange])

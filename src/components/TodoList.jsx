@@ -36,7 +36,9 @@ const TodoList = ({
     }
     
     // Fourth: sort by timestamp (newer first) as fallback
-    return b.id - a.id
+    const aTimestamp = a.timestamp || 0
+    const bTimestamp = b.timestamp || 0
+    return bTimestamp - aTimestamp
   })
 
   return (
