@@ -2,6 +2,8 @@
 
 **LongList** is a modern task management application built with React and Vite. Designed for seamless task organization across devices, with powerful synchronization to Microsoft OneDrive using the Microsoft Graph API.
 
+If you just want to use the app you can find it here https://longlist.app
+
 ## Features
 
 - **Add, edit, complete, and delete tasks**
