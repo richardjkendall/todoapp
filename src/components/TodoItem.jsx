@@ -390,8 +390,8 @@ const TodoItem = ({
             </TodoActions>
           )}
           
-          {/* Always show share button - essential for mobile sharing since both swipe directions are used */}
-          {!isEditing && (
+          {/* Always show share button for incomplete todos - essential for mobile sharing since both swipe directions are used */}
+          {!isEditing && !todo.completed && (
             <TodoActions>
               <ButtonGroup>
                 <ShareButton todo={todo} />
