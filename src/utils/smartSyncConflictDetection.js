@@ -47,6 +47,42 @@ function todosHaveSameContent(todo1, todo2) {
 }
 
 /**
+ * Check if todos differ only in order field (common when adding new todos)
+ */
+function todosOnlyDifferInOrder(todo1, todo2) {
+  if (!todo1 || !todo2) return false
+  
+  const nonOrderFields = ['text', 'completed', 'tags', 'priority']
+  
+  for (const field of nonOrderFields) {
+    let val1 = todo1[field]
+    let val2 = todo2[field]
+    
+    // Normalize values for comparison (same as above)
+    if (field === 'text') {
+      val1 = (val1 || '').trim()
+      val2 = (val2 || '').trim()
+    } else if (field === 'completed') {
+      val1 = Boolean(val1)
+      val2 = Boolean(val2)
+    } else if (field === 'tags') {
+      val1 = JSON.stringify((val1 || []).sort())
+      val2 = JSON.stringify((val2 || []).sort())
+    } else if (field === 'priority') {
+      val1 = val1 || 3
+      val2 = val2 || 3
+    }
+    
+    if (val1 !== val2) return false // Differs in more than just order
+  }
+  
+  // Check if order actually differs
+  const order1 = todo1.order || 0
+  const order2 = todo2.order || 0
+  return order1 !== order2
+}
+
+/**
  * Determine if two todos should conflict based on timestamps and content
  */
 function shouldConflict(localTodo, remoteTodo) {
@@ -67,6 +103,12 @@ function shouldConflict(localTodo, remoteTodo) {
   // Same content = no conflict regardless of timing
   if (todosHaveSameContent(localTodo, remoteTodo)) {
     console.log(`✅ Same content for todo ${localTodo.id} - no conflict`)
+    return false
+  }
+  
+  // Order-only differences should favor local version (common when adding new todos)
+  if (todosOnlyDifferInOrder(localTodo, remoteTodo)) {
+    console.log(`🔄 Order-only difference for todo ${localTodo.id} - local wins`)
     return false
   }
   
