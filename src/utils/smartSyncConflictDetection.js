@@ -5,6 +5,8 @@
  * Use modification timestamps to intelligently resolve most conflicts automatically.
  */
 
+import { conflictLogger } from './logger'
+
 // Configuration constants
 const CONFLICT_WINDOW = 5 * 60 * 1000      // 5 minutes - only consider conflicts within this window
 const CLEAR_WINNER_THRESHOLD = 30 * 1000   // 30 seconds - clear winner if time diff > this
@@ -92,23 +94,22 @@ function shouldConflict(localTodo, remoteTodo) {
   const timeDiff = Math.abs(localTime - remoteTime)
   const now = Date.now()
   
-  console.log(`🕐 Timestamp analysis for todo ${localTodo.id}:`, {
-    localTime: new Date(localTime).toISOString(),
-    remoteTime: new Date(remoteTime).toISOString(),
-    timeDiff: `${Math.round(timeDiff / 1000)}s`,
-    localAge: `${Math.round((now - localTime) / 1000)}s ago`,
-    remoteAge: `${Math.round((now - remoteTime) / 1000)}s ago`
+  conflictLogger.debug('Analyzing timestamps for conflict detection', {
+    todoId: localTodo.id,
+    timeDiffSeconds: Math.round(timeDiff / 1000),
+    localWins: localTime > remoteTime,
+    withinConflictWindow: timeDiff <= CONFLICT_WINDOW
   })
   
   // Same content = no conflict regardless of timing
   if (todosHaveSameContent(localTodo, remoteTodo)) {
-    console.log(`✅ Same content for todo ${localTodo.id} - no conflict`)
+    conflictLogger.debug('Same content detected - no conflict', { todoId: localTodo.id })
     return false
   }
   
   // Order-only differences should favor local version (common when adding new todos)
   if (todosOnlyDifferInOrder(localTodo, remoteTodo)) {
-    console.log(`🔄 Order-only difference for todo ${localTodo.id} - local wins`)
+    conflictLogger.debug('Order-only difference detected - local wins', { todoId: localTodo.id })
     return false
   }
   
@@ -234,7 +235,7 @@ export function smartSyncResolve(localTodos, remoteTodos, localDeletedIds = new 
   resolved.push(...remoteTombstones)
   
   const totalTombstones = tombstonesToCreate.length + remoteTombstones.length
-  console.log(`✨ Smart sync complete: ${resolved.length - totalTombstones} active todos, ${totalTombstones} tombstones (${tombstonesToCreate.length} new), ${conflicts.length} conflicts`)
+  // Smart sync complete - this log is now handled by the calling function
   
   return {
     resolved, // Includes both active todos and tombstones

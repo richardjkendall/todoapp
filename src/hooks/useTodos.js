@@ -6,6 +6,7 @@ import { useTodoOperations } from './useTodoOperations'
 import { useTodoSearch } from './useTodoSearch'
 import { useTodoTextParser } from './useTodoTextParser'
 import { smartMergeTodos, createConflictInfo } from '../utils/conflictDetection'
+import { syncLogger, storageLogger, appLogger } from '../utils/logger'
 
 /**
  * Main todos hook - simplified by composing focused sub-hooks
@@ -20,7 +21,7 @@ const useTodos = () => {
   const { syncHealthScore, validateTodos, cleanupTodos } = useDataIntegrity(todos, true) // Always use OneDrive mode
   
   const onUserChange = useCallback(() => {
-    console.log('User made changes - will sync to OneDrive')
+    syncLogger.debug('User made changes - sync triggered')
     setHasUserMadeChanges(true)
     // Track when local data was last modified
     localStorage.setItem('lastLocalModified', Date.now().toString())
@@ -70,7 +71,7 @@ const useTodos = () => {
 
   // Log sync status changes for debugging
   useEffect(() => {
-    console.log('Sync status changed to:', syncStatus)
+    syncLogger.debug('Sync status changed', { status: syncStatus })
   }, [syncStatus])
 
   /**
@@ -89,14 +90,17 @@ const useTodos = () => {
           // Re-save localStorage without tombstones to clean it up
           if (activeTodos.length !== cleaned.length) {
             localStorage.setItem('todos', JSON.stringify(activeTodos))
-            console.log(`🧹 Cleaned up ${cleaned.length - activeTodos.length} tombstones from localStorage`)
+            storageLogger.info('Tombstones cleaned up from localStorage', { 
+              tombstonesRemoved: cleaned.length - activeTodos.length,
+              activeTodos: activeTodos.length 
+            })
           }
           return activeTodos
         }
       }
       return []
     } catch (error) {
-      console.error('Failed to load todos from localStorage:', error)
+      storageLogger.error('Failed to load todos from localStorage', { error: error.message })
       return []
     }
   }, [cleanupTodos])
@@ -185,7 +189,11 @@ const useTodos = () => {
             return
           } else {
             // No conflicts - apply smart sync result
-            console.log(`Smart sync successful: ${syncResult.summary.activeTodos} active todos, ${syncResult.summary.tombstones} tombstones, ${syncResult.summary.conflicts} conflicts`)
+            syncLogger.info('Smart sync completed successfully', {
+              activeTodos: syncResult.summary.activeTodos,
+              tombstones: syncResult.summary.tombstones,
+              conflicts: syncResult.summary.conflicts
+            })
             setIsSyncing(true)
             
             // Filter out tombstones before setting to UI state
