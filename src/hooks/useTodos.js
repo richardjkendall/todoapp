@@ -7,6 +7,7 @@ import { useTodoSearch } from './useTodoSearch'
 import { useTodoTextParser } from './useTodoTextParser'
 import { smartMergeTodos, createConflictInfo } from '../utils/conflictDetection'
 import { syncLogger, storageLogger, appLogger } from '../utils/logger'
+import { initializeNotificationMonitoring } from '../utils/todoNotificationLogic'
 
 /**
  * Main todos hook - simplified by composing focused sub-hooks
@@ -341,6 +342,7 @@ const useTodos = () => {
   // Use ref to track previous todos to avoid unnecessary saves
   const previousTodosRef = useRef(null)
   const saveTodosRef = useRef(saveTodos)
+  const notificationCleanupRef = useRef(null)
   saveTodosRef.current = saveTodos
 
   // Auto-save when todos actually change (only to localStorage, not OneDrive)
@@ -420,6 +422,37 @@ const useTodos = () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange)
     }
   }, [isAuthenticated, isLoaded])
+
+  // Initialize notification monitoring when todos are loaded
+  useEffect(() => {
+    if (isLoaded && todos.length >= 0) {
+      // Clean up any existing notification monitoring
+      if (notificationCleanupRef.current) {
+        notificationCleanupRef.current()
+        notificationCleanupRef.current = null
+      }
+
+      // Initialize notification monitoring with a function to get current todos and todo operations
+      const getTodos = () => todos
+      const todoOperations = {
+        toggleComplete: operations.toggleComplete
+      }
+      const cleanup = initializeNotificationMonitoring(getTodos, todoOperations, 30 * 60 * 1000) // Check every 30 minutes
+      notificationCleanupRef.current = cleanup
+
+      appLogger.info('Notification monitoring initialized', { 
+        todoCount: todos.length 
+      })
+    }
+
+    // Cleanup on unmount
+    return () => {
+      if (notificationCleanupRef.current) {
+        notificationCleanupRef.current()
+        notificationCleanupRef.current = null
+      }
+    }
+  }, [isLoaded, todos.length]) // Re-initialize when todo count changes significantly
 
   return {
     // Core state
