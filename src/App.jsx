@@ -90,6 +90,8 @@ const AppContent = () => {
       setQuickFilteredTodos(null)
       setActiveQuickFilters(null)
       setFilterStats(null)
+      // Also clear persisted quick filters when search starts
+      localStorage.removeItem('quickFilters')
     }
     searchTodos(query)
   }
