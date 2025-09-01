@@ -6,6 +6,8 @@ import { useTodoOperations } from './useTodoOperations'
 import { useTodoSearch } from './useTodoSearch'
 import { useTodoTextParser } from './useTodoTextParser'
 import { smartMergeTodos, createConflictInfo } from '../utils/conflictDetection'
+import { syncLogger, storageLogger, appLogger } from '../utils/logger'
+import { initializeNotificationMonitoring } from '../utils/todoNotificationLogic'
 
 /**
  * Main todos hook - simplified by composing focused sub-hooks
@@ -20,7 +22,7 @@ const useTodos = () => {
   const { syncHealthScore, validateTodos, cleanupTodos } = useDataIntegrity(todos, true) // Always use OneDrive mode
   
   const onUserChange = useCallback(() => {
-    console.log('User made changes - will sync to OneDrive')
+    syncLogger.debug('User made changes - sync triggered')
     setHasUserMadeChanges(true)
     // Track when local data was last modified
     localStorage.setItem('lastLocalModified', Date.now().toString())
@@ -70,7 +72,7 @@ const useTodos = () => {
 
   // Log sync status changes for debugging
   useEffect(() => {
-    console.log('Sync status changed to:', syncStatus)
+    syncLogger.debug('Sync status changed', { status: syncStatus })
   }, [syncStatus])
 
   /**
@@ -89,14 +91,17 @@ const useTodos = () => {
           // Re-save localStorage without tombstones to clean it up
           if (activeTodos.length !== cleaned.length) {
             localStorage.setItem('todos', JSON.stringify(activeTodos))
-            console.log(`🧹 Cleaned up ${cleaned.length - activeTodos.length} tombstones from localStorage`)
+            storageLogger.info('Tombstones cleaned up from localStorage', { 
+              tombstonesRemoved: cleaned.length - activeTodos.length,
+              activeTodos: activeTodos.length 
+            })
           }
           return activeTodos
         }
       }
       return []
     } catch (error) {
-      console.error('Failed to load todos from localStorage:', error)
+      storageLogger.error('Failed to load todos from localStorage', { error: error.message })
       return []
     }
   }, [cleanupTodos])
@@ -110,13 +115,13 @@ const useTodos = () => {
       
       // Only sync to OneDrive if this was a user action and we're authenticated
       if (isAuthenticated && fromUserAction) {
-        console.log('Triggering OneDrive sync for user action. Current syncStatus:', syncStatus)
+        syncLogger.debug('Triggering OneDrive sync for user action', { syncStatus })
         saveToOneDrive(todosToSave, true) // Show toast for user actions
       } else {
-        console.log('Skipping OneDrive sync - isAuthenticated:', isAuthenticated, 'fromUserAction:', fromUserAction)
+        syncLogger.debug('Skipping OneDrive sync', { isAuthenticated, fromUserAction })
       }
     } catch (error) {
-      console.error('Failed to save todos:', error)
+      syncLogger.error('Failed to save todos', { error: error.message })
     }
   }, [isAuthenticated, saveToOneDrive])
 
@@ -185,7 +190,11 @@ const useTodos = () => {
             return
           } else {
             // No conflicts - apply smart sync result
-            console.log(`Smart sync successful: ${syncResult.summary.activeTodos} active todos, ${syncResult.summary.tombstones} tombstones, ${syncResult.summary.conflicts} conflicts`)
+            syncLogger.info('Smart sync completed successfully', {
+              activeTodos: syncResult.summary.activeTodos,
+              tombstones: syncResult.summary.tombstones,
+              conflicts: syncResult.summary.conflicts
+            })
             setIsSyncing(true)
             
             // Filter out tombstones before setting to UI state
@@ -333,6 +342,7 @@ const useTodos = () => {
   // Use ref to track previous todos to avoid unnecessary saves
   const previousTodosRef = useRef(null)
   const saveTodosRef = useRef(saveTodos)
+  const notificationCleanupRef = useRef(null)
   saveTodosRef.current = saveTodos
 
   // Auto-save when todos actually change (only to localStorage, not OneDrive)
@@ -343,7 +353,7 @@ const useTodos = () => {
       const previousTodosString = previousTodosRef.current
       
       if (previousTodosString !== todosString) {
-        console.log('Todos changed - auto-save triggered. hasUserMadeChanges:', hasUserMadeChanges, 'isSyncing:', isSyncing)
+        syncLogger.debug('Todos changed - auto-save triggered', { hasUserMadeChanges, isSyncing })
         previousTodosRef.current = todosString
         
         // Capture current value of hasUserMadeChanges to avoid stale closure
@@ -352,7 +362,7 @@ const useTodos = () => {
         const timeoutId = setTimeout(() => {
           saveTodosRef.current(todos, shouldSyncToOneDrive)
           if (shouldSyncToOneDrive) {
-            console.log('Resetting hasUserMadeChanges flag after save')
+            syncLogger.debug('Resetting hasUserMadeChanges flag after save')
             setHasUserMadeChanges(false) // Reset flag after sync
           }
         }, 500)
@@ -412,6 +422,37 @@ const useTodos = () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange)
     }
   }, [isAuthenticated, isLoaded])
+
+  // Initialize notification monitoring when todos are loaded
+  useEffect(() => {
+    if (isLoaded && todos.length >= 0) {
+      // Clean up any existing notification monitoring
+      if (notificationCleanupRef.current) {
+        notificationCleanupRef.current()
+        notificationCleanupRef.current = null
+      }
+
+      // Initialize notification monitoring with a function to get current todos and todo operations
+      const getTodos = () => todos
+      const todoOperations = {
+        toggleComplete: operations.toggleComplete
+      }
+      const cleanup = initializeNotificationMonitoring(getTodos, todoOperations, 30 * 60 * 1000) // Check every 30 minutes
+      notificationCleanupRef.current = cleanup
+
+      appLogger.info('Notification monitoring initialized', { 
+        todoCount: todos.length 
+      })
+    }
+
+    // Cleanup on unmount
+    return () => {
+      if (notificationCleanupRef.current) {
+        notificationCleanupRef.current()
+        notificationCleanupRef.current = null
+      }
+    }
+  }, [isLoaded, todos.length]) // Re-initialize when todo count changes significantly
 
   return {
     // Core state

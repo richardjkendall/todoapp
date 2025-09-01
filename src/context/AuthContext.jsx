@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import { msalInstance, graphScopes } from '../config/msalConfig'
+import { authLogger } from '../utils/logger'
 
 const AuthContext = createContext(null)
 
@@ -31,7 +32,11 @@ export const AuthProvider = ({ children }) => {
         // Handle any pending redirects
         const response = await msalInstance.handleRedirectPromise()
         if (response) {
-          console.log('Redirect authentication successful:', response)
+          authLogger.info('Redirect authentication successful', {
+            accountId: response.account?.homeAccountId,
+            tenantId: response.account?.tenantId,
+            username: response.account?.username
+          })
         }
         
         setIsInitialized(true)
@@ -47,7 +52,10 @@ export const AuthProvider = ({ children }) => {
           // Profile photo will be fetched via useEffect when isAuthenticated/user changes
         }
       } catch (error) {
-        console.error('Error initializing MSAL or checking auth status:', error)
+        authLogger.error('Error initializing MSAL or checking auth status', {
+          error: error.message,
+          name: error.name
+        })
         setError(error.message)
       } finally {
         setIsLoading(false)
@@ -61,12 +69,16 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     const fetchPhoto = async () => {
       if (!isAuthenticated || !user || !isInitialized) {
-        console.log('Skipping photo fetch - not ready:', { isAuthenticated, user: !!user, isInitialized })
+        authLogger.debug('Skipping photo fetch - authentication not ready', {
+          isAuthenticated,
+          hasUser: !!user,
+          isInitialized
+        })
         return
       }
 
       try {
-        console.log('Starting profile photo fetch...')
+        authLogger.debug('Starting profile photo fetch')
         setIsLoadingPhoto(true)
         
         // Get access token
@@ -76,7 +88,7 @@ export const AuthProvider = ({ children }) => {
         }
         const response = await msalInstance.acquireTokenSilent(silentRequest)
         const token = response.accessToken
-        console.log('Got access token for photo fetch')
+        authLogger.debug('Access token acquired for photo fetch')
         
         // Fetch profile photo
         const photoResponse = await fetch('https://graph.microsoft.com/v1.0/me/photo/$value', {
@@ -85,22 +97,25 @@ export const AuthProvider = ({ children }) => {
           }
         })
 
-        console.log('Photo fetch response status:', photoResponse.status)
+        authLogger.debug('Profile photo fetch response', { status: photoResponse.status })
 
         if (photoResponse.ok) {
-          console.log('Photo fetch successful, creating blob URL')
+          authLogger.debug('Photo fetch successful, creating blob URL')
           const blob = await photoResponse.blob()
           const photoUrl = URL.createObjectURL(blob)
           setProfilePhoto(photoUrl)
-          console.log('Profile photo set:', photoUrl)
+          authLogger.info('Profile photo loaded successfully')
         } else if (photoResponse.status === 404) {
-          console.log('User has no profile photo (404)')
+          authLogger.debug('User has no profile photo')
           setProfilePhoto(null)
         } else {
           throw new Error(`Failed to fetch profile photo: ${photoResponse.status}`)
         }
       } catch (error) {
-        console.error('Error fetching profile photo:', error)
+        authLogger.error('Error fetching profile photo', {
+          error: error.message,
+          name: error.name
+        })
         setProfilePhoto(null)
       } finally {
         setIsLoadingPhoto(false)
@@ -138,7 +153,10 @@ export const AuthProvider = ({ children }) => {
         return response
       }
     } catch (error) {
-      console.error('Login error:', error)
+      authLogger.error('Login error', {
+        error: error.message,
+        name: error.name
+      })
       setError(error.message)
       throw error
     } finally {
@@ -172,7 +190,10 @@ export const AuthProvider = ({ children }) => {
       }
       setProfilePhoto(null)
     } catch (error) {
-      console.error('Logout error:', error)
+      authLogger.error('Logout error', {
+        error: error.message,
+        name: error.name
+      })
       setError(error.message)
     } finally {
       setIsLoading(false)
@@ -197,7 +218,9 @@ export const AuthProvider = ({ children }) => {
       const response = await msalInstance.acquireTokenSilent(silentRequest)
       return response.accessToken
     } catch (error) {
-      console.error('Token acquisition error:', error)
+      authLogger.warn('Silent token acquisition failed', {
+        error: error.message
+      })
       
       // If silent request fails, try interactive
       if (error.name === 'InteractionRequiredAuthError') {
@@ -208,7 +231,10 @@ export const AuthProvider = ({ children }) => {
           })
           return response.accessToken
         } catch (interactiveError) {
-          console.error('Interactive token acquisition error:', interactiveError)
+          authLogger.error('Interactive token acquisition failed', {
+            error: interactiveError.message,
+            name: interactiveError.name
+          })
           throw interactiveError
         }
       }

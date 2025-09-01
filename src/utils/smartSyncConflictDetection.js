@@ -5,6 +5,8 @@
  * Use modification timestamps to intelligently resolve most conflicts automatically.
  */
 
+import { conflictLogger } from './logger'
+
 // Configuration constants
 const CONFLICT_WINDOW = 5 * 60 * 1000      // 5 minutes - only consider conflicts within this window
 const CLEAR_WINNER_THRESHOLD = 30 * 1000   // 30 seconds - clear winner if time diff > this
@@ -92,47 +94,46 @@ function shouldConflict(localTodo, remoteTodo) {
   const timeDiff = Math.abs(localTime - remoteTime)
   const now = Date.now()
   
-  console.log(`🕐 Timestamp analysis for todo ${localTodo.id}:`, {
-    localTime: new Date(localTime).toISOString(),
-    remoteTime: new Date(remoteTime).toISOString(),
-    timeDiff: `${Math.round(timeDiff / 1000)}s`,
-    localAge: `${Math.round((now - localTime) / 1000)}s ago`,
-    remoteAge: `${Math.round((now - remoteTime) / 1000)}s ago`
+  conflictLogger.debug('Analyzing timestamps for conflict detection', {
+    todoId: localTodo.id,
+    timeDiffSeconds: Math.round(timeDiff / 1000),
+    localWins: localTime > remoteTime,
+    withinConflictWindow: timeDiff <= CONFLICT_WINDOW
   })
   
   // Same content = no conflict regardless of timing
   if (todosHaveSameContent(localTodo, remoteTodo)) {
-    console.log(`✅ Same content for todo ${localTodo.id} - no conflict`)
+    conflictLogger.debug('Same content detected - no conflict', { todoId: localTodo.id })
     return false
   }
   
   // Order-only differences should favor local version (common when adding new todos)
   if (todosOnlyDifferInOrder(localTodo, remoteTodo)) {
-    console.log(`🔄 Order-only difference for todo ${localTodo.id} - local wins`)
+    conflictLogger.debug('Order-only difference detected - local wins', { todoId: localTodo.id })
     return false
   }
   
   // If local change is very recent (within grace period), it always wins
   const localAge = now - localTime
   if (localAge < GRACE_PERIOD) {
-    console.log(`🚀 Local change is recent (${Math.round(localAge / 1000)}s) - local wins`)
+    conflictLogger.debug('Local change is recent - local wins', { ageSeconds: Math.round(localAge / 1000) })
     return false
   }
   
   // If changes are far apart in time, use the newer one
   if (timeDiff > CONFLICT_WINDOW) {
-    console.log(`⏰ Changes are far apart (${Math.round(timeDiff / 60000)}min) - use newer`)
+    conflictLogger.debug('Changes are far apart - use newer', { minutesApart: Math.round(timeDiff / 60000) })
     return false
   }
   
   // If there's a clear winner (>30s difference), use the newer one
   if (timeDiff > CLEAR_WINNER_THRESHOLD) {
-    console.log(`🏆 Clear winner (${Math.round(timeDiff / 1000)}s difference) - use newer`)
+    conflictLogger.debug('Clear winner - use newer', { secondsDifference: Math.round(timeDiff / 1000) })
     return false
   }
   
   // Real conflict: edited within 5min window, different content, no clear winner
-  console.log(`⚠️ Real conflict detected for todo ${localTodo.id} - simultaneous edits`)
+  conflictLogger.warn('Real conflict detected - simultaneous edits', { todoId: localTodo.id })
   return true
 }
 
@@ -234,7 +235,7 @@ export function smartSyncResolve(localTodos, remoteTodos, localDeletedIds = new 
   resolved.push(...remoteTombstones)
   
   const totalTombstones = tombstonesToCreate.length + remoteTombstones.length
-  console.log(`✨ Smart sync complete: ${resolved.length - totalTombstones} active todos, ${totalTombstones} tombstones (${tombstonesToCreate.length} new), ${conflicts.length} conflicts`)
+  // Smart sync complete - this log is now handled by the calling function
   
   return {
     resolved, // Includes both active todos and tombstones

@@ -4,6 +4,9 @@ import { ShareIcon } from './Icons'
 import { validateTodoForSharing } from '../utils/todoSharing'
 import { BaseIconButton } from '../styles/TodoStyles'
 import ShareModal from './ShareModal'
+import { shouldUseNativeShare } from '../utils/deviceDetection'
+import { shareToDoNatively } from '../utils/nativeShare'
+import { useAuth } from '../context/AuthContext'
 
 const ShareButtonStyled = styled(BaseIconButton)`
   &:disabled {
@@ -50,8 +53,10 @@ const Tooltip = styled.div`
 const ShareButton = ({ todo, className }) => {
   const [showModal, setShowModal] = useState(false)
   const [error, setError] = useState('')
+  const [isSharing, setIsSharing] = useState(false)
+  const { user, isAuthenticated } = useAuth()
 
-  const handleShare = () => {
+  const handleShare = async () => {
     // Validate todo can be shared
     const validation = validateTodoForSharing(todo)
     if (!validation.valid) {
@@ -60,7 +65,36 @@ const ShareButton = ({ todo, className }) => {
       return
     }
 
-    setShowModal(true)
+    // Use native share on touch devices if available
+    if (shouldUseNativeShare()) {
+      setIsSharing(true)
+      try {
+        // Get user name for share context if authenticated
+        const shareOptions = {}
+        if (isAuthenticated && user && user.name) {
+          shareOptions.userName = user.name
+        }
+        
+        const success = await shareToDoNatively(todo, shareOptions)
+        if (success) {
+          // Share completed successfully, no need to show modal
+          return
+        }
+        // If share was cancelled by user, also don't show error or modal
+        
+      } catch (shareError) {
+        // Native share failed, fall back to modal
+        console.warn('Native share failed, showing modal:', shareError.message)
+        setError(`Native share failed: ${shareError.message}`)
+        setTimeout(() => setError(''), 3000)
+        setShowModal(true)
+      } finally {
+        setIsSharing(false)
+      }
+    } else {
+      // Desktop or no native share - show modal
+      setShowModal(true)
+    }
   }
 
   const handleCloseModal = () => {
@@ -74,6 +108,7 @@ const ShareButton = ({ todo, className }) => {
       <TooltipContainer className={className}>
         <ShareButtonStyled
           onClick={handleShare}
+          disabled={isSharing}
           title="Share todo"
           aria-label="Share todo"
         >

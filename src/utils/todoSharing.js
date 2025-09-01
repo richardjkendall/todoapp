@@ -6,6 +6,7 @@
  */
 
 import LZString from 'lz-string'
+import { shareLogger } from './logger'
 
 // LZ-string compression for better URL handling
 // Using compressToEncodedURIComponent for better URL safety
@@ -47,9 +48,7 @@ const base64UrlDecode = (str) => {
  * @returns {string} Encoded share data
  */
 export const encodeTodoForSharing = (todo, options = {}) => {
-  console.log('=== Starting encode process ===')
-  console.log('Input todo:', todo)
-  console.log('Input options:', options)
+  shareLogger.debug('Starting todo encoding for sharing')
   
   try {
     // Validate todo object
@@ -62,7 +61,12 @@ export const encodeTodoForSharing = (todo, options = {}) => {
       ? options.userName.trim().substring(0, 100) // Limit name length
       : null
 
-    console.log('Sanitized userName:', userName)
+    shareLogger.debug('Todo encoding validation complete', {
+      todoId: todo.id,
+      hasUserName: !!userName,
+      hasTags: Array.isArray(todo.tags) && todo.tags.length > 0,
+      priority: todo.priority
+    })
 
     // Create a clean shared todo object
     const sharedTodo = {
@@ -78,29 +82,28 @@ export const encodeTodoForSharing = (todo, options = {}) => {
       }
     }
     
-    console.log('Shared todo object:', sharedTodo)
-    
     // Convert to JSON and compress with LZ-string
     const json = JSON.stringify(sharedTodo)
-    console.log('JSON string:', json)
-    console.log('JSON length:', json.length)
-    
     const compressed = compress(json)
-    console.log('Compressed result:', compressed)
-    console.log('Compressed length:', compressed ? compressed.length : 'null')
     
     if (!compressed) {
       throw new Error('Compression failed')
     }
     
-    // LZ-string compression is already URL-safe, so we can use it directly
     const result = `v2:${compressed}`
-    console.log('Final encoded result:', result)
-    console.log('=== Encode successful ===')
+    
+    shareLogger.info('Todo encoded successfully for sharing', {
+      originalLength: json.length,
+      compressedLength: compressed.length,
+      compressionRatio: Math.round((1 - compressed.length / json.length) * 100) + '%'
+    })
+    
     return result
   } catch (error) {
-    console.error('=== Encode failed ===')
-    console.error('Failed to encode todo for sharing:', error)
+    shareLogger.error('Failed to encode todo for sharing', {
+      error: error.message,
+      todoId: todo?.id
+    })
     throw new Error('Failed to create share link')
   }
 }
@@ -111,8 +114,7 @@ export const encodeTodoForSharing = (todo, options = {}) => {
  * @returns {Object|null} Decoded todo or null if invalid
  */
 export const decodeTodoFromShare = (shareData) => {
-  console.log('=== Starting decode process ===')
-  console.log('Share data:', shareData)
+  shareLogger.debug('Starting todo decoding from share data')
   
   try {
     // Parse version
@@ -124,31 +126,30 @@ export const decodeTodoFromShare = (shareData) => {
     const version = shareData.substring(0, colonIndex)
     const encoded = shareData.substring(colonIndex + 1)
     
-    console.log('Version:', version)
-    console.log('Encoded length:', encoded.length)
-    console.log('Encoded (first 100 chars):', encoded.substring(0, 100))
+    shareLogger.debug('Share data parsed', {
+      version,
+      encodedLength: encoded.length
+    })
     
     let json
     
     if (version === 'v1') {
       // Legacy format with base64URL encoding (no compression)
-      console.log('Decoding v1 format...')
+      shareLogger.debug('Decoding legacy v1 format')
       json = base64UrlDecode(encoded)
-      console.log('v1 decoded JSON:', json)
     } else if (version === 'v2') {
       // New format with LZ-string compression
-      console.log('Decompressing v2 format...')
+      shareLogger.debug('Decompressing v2 format')
       json = decompress(encoded)
-      console.log('v2 decompressed JSON:', json)
       
       if (!json) {
         // Try fallback decompression method
-        console.log('Trying fallback decompression...')
+        shareLogger.warn('Primary decompression failed, trying fallback method')
         try {
           json = LZString.decompressFromBase64(encoded)
-          console.log('Fallback decompressed JSON:', json)
+          shareLogger.debug('Fallback decompression succeeded')
         } catch (fallbackError) {
-          console.error('Fallback decompression also failed:', fallbackError)
+          shareLogger.error('Fallback decompression failed', { error: fallbackError.message })
         }
         
         if (!json) {
@@ -159,9 +160,7 @@ export const decodeTodoFromShare = (shareData) => {
       throw new Error(`Unsupported version: ${version}`)
     }
     
-    console.log('About to parse JSON:', json)
     const todo = JSON.parse(json)
-    console.log('Parsed todo:', todo)
     
     // Validate required fields
     if (!todo || typeof todo.text !== 'string') {
@@ -177,14 +176,21 @@ export const decodeTodoFromShare = (shareData) => {
       metadata: todo.metadata || {}
     }
     
-    console.log('Final decoded result:', result)
-    console.log('=== Decode successful ===')
+    shareLogger.info('Todo decoded successfully from share data', {
+      version,
+      hasSharedBy: !!result.metadata?.sharedBy,
+      textLength: result.text.length,
+      tagCount: result.tags.length,
+      priority: result.priority
+    })
+    
     return result
     
   } catch (error) {
-    console.error('=== Decode failed ===')
-    console.error('Error:', error)
-    console.error('Share data:', shareData)
+    shareLogger.error('Failed to decode shared todo', {
+      error: error.message,
+      shareDataLength: shareData?.length
+    })
     return null
   }
 }

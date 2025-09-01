@@ -61,10 +61,10 @@ const WarningMessage = styled.p`
 
 
 const LocalStorageWarning = () => {
-  const { isAuthenticated } = useAuth()
+  const { isAuthenticated, isLoading, isInitialized } = useAuth()
 
-  // Don't show warning if user is authenticated
-  if (isAuthenticated) {
+  // Don't show warning if user is authenticated or auth is still loading/initializing
+  if (isAuthenticated || isLoading || !isInitialized) {
     return null
   }
 
