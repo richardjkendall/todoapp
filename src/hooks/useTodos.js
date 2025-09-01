@@ -114,13 +114,13 @@ const useTodos = () => {
       
       // Only sync to OneDrive if this was a user action and we're authenticated
       if (isAuthenticated && fromUserAction) {
-        console.log('Triggering OneDrive sync for user action. Current syncStatus:', syncStatus)
+        syncLogger.debug('Triggering OneDrive sync for user action', { syncStatus })
         saveToOneDrive(todosToSave, true) // Show toast for user actions
       } else {
-        console.log('Skipping OneDrive sync - isAuthenticated:', isAuthenticated, 'fromUserAction:', fromUserAction)
+        syncLogger.debug('Skipping OneDrive sync', { isAuthenticated, fromUserAction })
       }
     } catch (error) {
-      console.error('Failed to save todos:', error)
+      syncLogger.error('Failed to save todos', { error: error.message })
     }
   }, [isAuthenticated, saveToOneDrive])
 
@@ -351,7 +351,7 @@ const useTodos = () => {
       const previousTodosString = previousTodosRef.current
       
       if (previousTodosString !== todosString) {
-        console.log('Todos changed - auto-save triggered. hasUserMadeChanges:', hasUserMadeChanges, 'isSyncing:', isSyncing)
+        syncLogger.debug('Todos changed - auto-save triggered', { hasUserMadeChanges, isSyncing })
         previousTodosRef.current = todosString
         
         // Capture current value of hasUserMadeChanges to avoid stale closure
@@ -360,7 +360,7 @@ const useTodos = () => {
         const timeoutId = setTimeout(() => {
           saveTodosRef.current(todos, shouldSyncToOneDrive)
           if (shouldSyncToOneDrive) {
-            console.log('Resetting hasUserMadeChanges flag after save')
+            syncLogger.debug('Resetting hasUserMadeChanges flag after save')
             setHasUserMadeChanges(false) // Reset flag after sync
           }
         }, 500)

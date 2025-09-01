@@ -161,6 +161,7 @@ export const syncLogger = new Logger('Sync')
 export const shareLogger = new Logger('Share')
 export const storageLogger = new Logger('Storage')
 export const conflictLogger = new Logger('Conflict')
+export const filterLogger = new Logger('Filter')
 
 // Default export
 export default Logger

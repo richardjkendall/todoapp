@@ -79,6 +79,13 @@ const SyncStatusIndicator = ({
     )
   }
 
+  // Don't show sync status during initial load to prevent flash
+  // Wait until we have meaningful sync state or conflicts
+  const isInitializing = syncStatus === 'idle' && !lastSyncTime && !conflictInfo && queueStatus?.count === 0
+  if (isInitializing) {
+    return null
+  }
+
   const getStatusInfo = () => {
     if (conflictInfo) {
       return {

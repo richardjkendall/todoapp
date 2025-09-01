@@ -116,24 +116,24 @@ function shouldConflict(localTodo, remoteTodo) {
   // If local change is very recent (within grace period), it always wins
   const localAge = now - localTime
   if (localAge < GRACE_PERIOD) {
-    console.log(`🚀 Local change is recent (${Math.round(localAge / 1000)}s) - local wins`)
+    conflictLogger.debug('Local change is recent - local wins', { ageSeconds: Math.round(localAge / 1000) })
     return false
   }
   
   // If changes are far apart in time, use the newer one
   if (timeDiff > CONFLICT_WINDOW) {
-    console.log(`⏰ Changes are far apart (${Math.round(timeDiff / 60000)}min) - use newer`)
+    conflictLogger.debug('Changes are far apart - use newer', { minutesApart: Math.round(timeDiff / 60000) })
     return false
   }
   
   // If there's a clear winner (>30s difference), use the newer one
   if (timeDiff > CLEAR_WINNER_THRESHOLD) {
-    console.log(`🏆 Clear winner (${Math.round(timeDiff / 1000)}s difference) - use newer`)
+    conflictLogger.debug('Clear winner - use newer', { secondsDifference: Math.round(timeDiff / 1000) })
     return false
   }
   
   // Real conflict: edited within 5min window, different content, no clear winner
-  console.log(`⚠️ Real conflict detected for todo ${localTodo.id} - simultaneous edits`)
+  conflictLogger.warn('Real conflict detected - simultaneous edits', { todoId: localTodo.id })
   return true
 }
 
