@@ -8,6 +8,9 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
+      srcDir: 'public',
+      filename: 'sw-notification-handler.js',
+      strategies: 'injectManifest',
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
         runtimeCaching: [
@@ -23,6 +26,10 @@ export default defineConfig({
             }
           }
         ]
+      },
+      devOptions: {
+        enabled: true,
+        type: 'module'
       },
       includeAssets: ['favicon.svg', 'apple-touch-icon.png', 'masked-icon.svg'],
       manifest: {

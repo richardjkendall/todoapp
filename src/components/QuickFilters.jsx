@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import styled from 'styled-components'
 import FilterChip from './FilterChip'
 import { useQuickFilters } from '../hooks/useQuickFilters'
@@ -50,6 +50,7 @@ const QuickFilters = ({
   filterStats = null
 }) => {
   const [activeFilters, setActiveFilters] = useState(new Set())
+  const hasRestoredFilters = useRef(false)
   const { quickFilterOptions, filterTodosByAge, filterTodosByPriorityGroup } = useQuickFilters(todos)
 
   // Load saved filters on component mount
@@ -94,14 +95,6 @@ const QuickFilters = ({
       })
     }
   }, [activeFilters])
-
-  // Apply restored filters when quickFilterOptions become available
-  useEffect(() => {
-    if (activeFilters.size > 0 && quickFilterOptions.length > 0) {
-      // Apply filters after restoration
-      applyFilters(activeFilters)
-    }
-  }, [quickFilterOptions]) // Only run when quickFilterOptions changes
 
   // Extract filter application logic to reuse
   const applyFilters = useCallback((filtersToApply) => {
@@ -167,6 +160,57 @@ const QuickFilters = ({
     setActiveFilters(newActiveFilters)
     applyFilters(newActiveFilters)
   }, [activeFilters, applyFilters])
+
+  // Apply restored filters when quickFilterOptions become available
+  useEffect(() => {
+    if (activeFilters.size > 0 && quickFilterOptions.length > 0 && !hasRestoredFilters.current) {
+      // Apply filters after restoration
+      filterLogger.debug('Applying restored filters', { filterCount: activeFilters.size })
+      hasRestoredFilters.current = true
+      applyFilters(activeFilters)
+    }
+  }, [quickFilterOptions, applyFilters]) // Only run when quickFilterOptions changes
+
+  // Listen for external filter requests (from notifications, etc.)
+  useEffect(() => {
+    const handleExternalFilterRequest = (event) => {
+      const { filterName, filterParams } = event.detail || {}
+      
+      filterLogger.debug('External filter request received', { filterName, filterParams })
+      
+      // Map external filter params to internal filter IDs
+      let filterId = null
+      
+      if (filterParams === 'aged') {
+        filterId = 'old-items'
+      } else if (filterParams === 'high-priority') {
+        filterId = 'high-priority'
+      } else if (filterName) {
+        // Try to find filter by name
+        const matchingOption = quickFilterOptions.find(opt => 
+          opt.label.toLowerCase().includes(filterName.toLowerCase())
+        )
+        filterId = matchingOption?.id
+      }
+      
+      if (filterId) {
+        filterLogger.info('Applying external filter', { filterId, filterName, filterParams })
+        
+        // Clear existing filters and apply the requested one
+        const newActiveFilters = new Set([filterId])
+        setActiveFilters(newActiveFilters)
+        applyFilters(newActiveFilters)
+      } else {
+        filterLogger.warn('Could not find matching filter', { filterName, filterParams, availableOptions: quickFilterOptions.map(opt => opt.id) })
+      }
+    }
+
+    window.addEventListener('quick-filter-select', handleExternalFilterRequest)
+    
+    return () => {
+      window.removeEventListener('quick-filter-select', handleExternalFilterRequest)
+    }
+  }, [quickFilterOptions, applyFilters])
   
   // Don't show quick filters if regular search is active
   if (searchActive) {

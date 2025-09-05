@@ -112,8 +112,11 @@ const AppContent = () => {
 
   // Handle notification filter requests
   const handleNotificationFilter = (filterParams) => {
+    console.log('handleNotificationFilter called with:', filterParams)
+    
     // Clear any existing search first
     if (searchActive) {
+      console.log('Clearing search before applying notification filter')
       handleClearSearch()
     }
     
@@ -129,14 +132,20 @@ const AppContent = () => {
     }
     
     const filterName = filterMap[filterParams]
+    console.log('Mapped filter params to filter name:', { filterParams, filterName })
+    
     if (filterName) {
       // Simulate clicking the appropriate quick filter
+      console.log('Dispatching quick-filter-select event')
       setTimeout(() => {
         const filterEvent = new CustomEvent('quick-filter-select', {
           detail: { filterName, filterParams }
         })
         window.dispatchEvent(filterEvent)
+        console.log('quick-filter-select event dispatched:', { filterName, filterParams })
       }, 100)
+    } else {
+      console.warn('No matching filter found for params:', filterParams)
     }
   }
 
@@ -156,19 +165,30 @@ const AppContent = () => {
 
     // Handle service worker messages from notifications
     const handleServiceWorkerMessage = (event) => {
+      console.log('Service worker message received:', event.data)
+      
       if (event.data?.type === 'NOTIFICATION_ACTION') {
         const { filterParams, action, notificationType } = event.data
+        
+        console.log('Processing notification action:', {
+          action,
+          notificationType,
+          filterParams,
+          hasFilterParams: !!filterParams
+        })
         
         if (filterParams) {
           handleNotificationFilter(filterParams)
         }
         
         // Log the notification interaction
-        console.log('Notification action received:', {
+        console.log('Notification action processed:', {
           action,
           notificationType,
           filterParams
         })
+      } else {
+        console.log('Unknown service worker message type:', event.data?.type)
       }
     }
 

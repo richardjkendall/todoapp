@@ -3,12 +3,19 @@
  * Handles notification clicks and actions in PWA context
  */
 
-// Import notification handler
-importScripts('/src/utils/notificationService.js')
+import { precacheAndRoute, cleanupOutdatedCaches } from 'workbox-precaching'
+
+// Precache and route setup
+precacheAndRoute(self.__WB_MANIFEST)
+cleanupOutdatedCaches()
 
 // Handle notification click events
 self.addEventListener('notificationclick', async (event) => {
-  console.log('Notification clicked:', event)
+  console.log('Service Worker: Notification clicked', {
+    action: event.action,
+    tag: event.notification.tag,
+    data: event.notification.data
+  })
   
   const notification = event.notification
   const action = event.action
@@ -26,41 +33,57 @@ self.addEventListener('notificationclick', async (event) => {
     count: data.count || 0
   }
   
+  console.log('Service Worker: Processing notification action', notificationData)
+  
+  event.waitUntil(handleNotificationAction(notificationData))
+})
+
+// Handle notification actions
+async function handleNotificationAction(notificationData) {
   try {
-    // Handle the notification click
-    if (typeof handleNotificationClick === 'function') {
-      await handleNotificationClick(event, notificationData)
-    } else {
-      // Fallback: just open/focus the app
-      const urlToOpen = getUrlFromNotificationData(notificationData)
+    const urlToOpen = getUrlFromNotificationData(notificationData)
+    const filterParams = getFilterParams(notificationData)
+    
+    console.log('Service Worker: Determining action', {
+      urlToOpen,
+      filterParams,
+      action: notificationData.action,
+      type: notificationData.type
+    })
+    
+    const clients = await self.clients.matchAll({
+      type: 'window',
+      includeUncontrolled: true
+    })
+    
+    console.log('Service Worker: Found clients', { count: clients.length })
+    
+    if (clients.length > 0) {
+      // Focus existing window
+      const client = clients[0]
+      await client.focus()
       
-      const clients = await self.clients.matchAll({
-        type: 'window',
-        includeUncontrolled: true
-      })
-      
-      if (clients.length > 0) {
-        // Focus existing window
-        const client = clients[0]
-        await client.focus()
-        
-        // Send message to main app
-        client.postMessage({
-          type: 'NOTIFICATION_ACTION',
-          action: notificationData.action,
-          notificationType: notificationData.type,
-          filterParams: getFilterParams(notificationData),
-          url: urlToOpen
-        })
-      } else {
-        // Open new window
-        await self.clients.openWindow(urlToOpen)
+      const message = {
+        type: 'NOTIFICATION_ACTION',
+        action: notificationData.action,
+        notificationType: notificationData.type,
+        filterParams: filterParams,
+        url: urlToOpen
       }
+      
+      console.log('Service Worker: Sending message to client', message)
+      
+      // Send message to main app
+      client.postMessage(message)
+    } else {
+      console.log('Service Worker: No existing windows, opening new one', urlToOpen)
+      // Open new window
+      await self.clients.openWindow(urlToOpen)
     }
   } catch (error) {
-    console.error('Error handling notification click:', error)
+    console.error('Service Worker: Error handling notification action:', error)
   }
-})
+}
 
 // Helper function to get URL from notification data
 function getUrlFromNotificationData(data) {
