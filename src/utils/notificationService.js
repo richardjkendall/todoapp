@@ -155,11 +155,18 @@ export async function showNotification(options) {
   filterLogger.debug('Attempting to show notification', { 
     title: options.title,
     tag: options.tag,
-    hasServiceWorker: 'serviceWorker' in navigator
+    hasServiceWorker: 'serviceWorker' in navigator,
+    permission: Notification.permission,
+    supported: isNotificationSupported(),
+    canShow: canShowNotifications()
   })
 
   if (!canShowNotifications()) {
-    filterLogger.debug('Cannot show notifications - not enabled or permitted')
+    filterLogger.warn('Cannot show notifications', {
+      supported: isNotificationSupported(),
+      permission: Notification.permission,
+      settings: getNotificationSettings()
+    })
     return false
   }
 
@@ -169,10 +176,17 @@ export async function showNotification(options) {
     // Try service worker first, but with timeout and fallback
     if ('serviceWorker' in navigator) {
       try {
+        filterLogger.debug('Checking service worker registration')
         const registration = await Promise.race([
           navigator.serviceWorker.ready,
           new Promise((_, reject) => setTimeout(() => reject(new Error('Service worker timeout')), 2000))
         ])
+        
+        filterLogger.debug('Service worker registration status', {
+          exists: !!registration,
+          active: !!registration?.active,
+          scope: registration?.scope
+        })
         
         if (registration && registration.active) {
           // Use service worker for persistent notifications
@@ -191,14 +205,20 @@ export async function showNotification(options) {
           usedServiceWorker = true
           filterLogger.info('Service worker notification shown', { 
             title: options.title,
-            tag: options.tag 
+            tag: options.tag,
+            hasActions: options.actions?.length > 0
           })
+        } else {
+          filterLogger.warn('Service worker not active, falling back to basic notification')
         }
       } catch (swError) {
         filterLogger.warn('Service worker notification failed, falling back to basic', {
-          error: swError.message
+          error: swError.message,
+          stack: swError.stack
         })
       }
+    } else {
+      filterLogger.debug('Service worker not supported, using basic notifications')
     }
     
     // Fallback to basic notification if service worker failed or unavailable
