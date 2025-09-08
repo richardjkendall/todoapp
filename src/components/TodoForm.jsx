@@ -1,9 +1,12 @@
 import { useState, useRef, useEffect } from 'react'
 import { Form, FormRow, InputContainer, Textarea, Button } from '../styles/TodoStyles'
 import InputHelper from './InputHelper'
+import PhotoButton from './PhotoButton'
+import LongPressButton from './LongPressButton'
 import { PlusIcon, SearchIcon } from './Icons'
+import { isMobileDevice } from '../utils/deviceUtils'
 
-const TodoForm = ({ onAddTodo, onSearch, searchActive, onClearSearch }) => {
+const TodoForm = ({ onAddTodo, onSearch, searchActive, onClearSearch, onShowCamera }) => {
   const [inputValue, setInputValue] = useState('')
   const [isSearchMode, setIsSearchMode] = useState(false)
   const [isFocused, setIsFocused] = useState(false)
@@ -69,6 +72,27 @@ const TodoForm = ({ onAddTodo, onSearch, searchActive, onClearSearch }) => {
     }
   }
 
+  const handlePhotoAdded = (markdownRef) => {
+    if (!textareaRef.current) return
+    
+    const textarea = textareaRef.current
+    const cursorPos = textarea.selectionStart
+    const currentValue = inputValue
+    
+    // Insert photo markdown at cursor position
+    const newValue = currentValue.slice(0, cursorPos) + markdownRef + ' ' + currentValue.slice(cursorPos)
+    setInputValue(newValue)
+    
+    // Auto resize after adding photo
+    setTimeout(() => {
+      autoResize(textarea)
+      // Restore cursor position after the inserted text
+      textarea.focus()
+      const newCursorPos = cursorPos + markdownRef.length + 1
+      textarea.setSelectionRange(newCursorPos, newCursorPos)
+    }, 0)
+  }
+
   const autoResize = (textarea) => {
     textarea.style.height = 'auto'
     const lineHeight = 20 // approximate line height
@@ -101,9 +125,22 @@ const TodoForm = ({ onAddTodo, onSearch, searchActive, onClearSearch }) => {
           <InputHelper show={showHelper} isSearchMode={isSearchMode} inputRef={textareaRef} />
         </InputContainer>
       </FormRow>
-      <Button type="submit" title={isSearchMode ? 'Search' : 'Add Todo'}>
-        {isSearchMode ? <SearchIcon /> : <PlusIcon />}
-      </Button>
+      {/* Mobile: Long press button, Desktop: Separate buttons */}
+      {isMobileDevice() ? (
+        <LongPressButton
+          onPhotoAdded={handlePhotoAdded}
+          onShowCamera={onShowCamera}
+          isSearchMode={isSearchMode}
+          disabled={false}
+        />
+      ) : (
+        <>
+          <PhotoButton onPhotoAdded={handlePhotoAdded} disabled={isSearchMode} onShowCamera={onShowCamera} />
+          <Button type="submit" title={isSearchMode ? 'Search' : 'Add Todo'}>
+            {isSearchMode ? <SearchIcon /> : <PlusIcon />}
+          </Button>
+        </>
+      )}
     </Form>
   )
 }

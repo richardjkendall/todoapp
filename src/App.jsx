@@ -20,6 +20,7 @@ import SharedTodoModal from './components/SharedTodoModal'
 import QuickFilters from './components/QuickFilters'
 import NotificationSettingsModal from './components/NotificationSettingsModal'
 import NotificationToggle from './components/NotificationToggle'
+import CameraCapture from './components/CameraCapture'
 import { useSharedTodo } from './hooks/useSharedTodo'
 import { 
   GlobalStyle, 
@@ -38,6 +39,8 @@ const AppContent = () => {
   const [activeQuickFilters, setActiveQuickFilters] = useState(null)
   const [filterStats, setFilterStats] = useState(null)
   const [showNotificationSettings, setShowNotificationSettings] = useState(false)
+  const [showCameraCapture, setShowCameraCapture] = useState(false)
+  const [onPhotoCapture, setOnPhotoCapture] = useState(null)
   
   // Handle shared todos from URLs
   const { sharedTodo, clearSharedTodo, acceptSharedTodo } = useSharedTodo()
@@ -108,6 +111,24 @@ const AppContent = () => {
   // Handle notification settings toggle
   const handleNotificationToggle = () => {
     setShowNotificationSettings(!showNotificationSettings)
+  }
+
+  // Handle camera modal
+  const handleShowCamera = (photoCallback) => {
+    setOnPhotoCapture(() => photoCallback)
+    setShowCameraCapture(true)
+  }
+
+  const handleCameraClose = () => {
+    setShowCameraCapture(false)
+    setOnPhotoCapture(null)
+  }
+
+  const handlePhotoCapture = (photoBlob) => {
+    if (onPhotoCapture) {
+      onPhotoCapture(photoBlob)
+    }
+    handleCameraClose()
   }
 
   // Handle notification filter requests
@@ -217,6 +238,7 @@ const AppContent = () => {
             onSearch={handleSearch}
             onClearSearch={handleClearSearch}
             searchActive={searchActive}
+            onShowCamera={handleShowCamera}
           />
         </StickyHeader>
         
@@ -288,6 +310,14 @@ const AppContent = () => {
         isVisible={showNotificationSettings}
         onClose={() => setShowNotificationSettings(false)}
       />
+      
+      {/* Camera Capture Modal */}
+      {showCameraCapture && (
+        <CameraCapture
+          onPhotoCapture={handlePhotoCapture}
+          onClose={handleCameraClose}
+        />
+      )}
       
       <ToastRenderer />
     </StyledThemeProvider>

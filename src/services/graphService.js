@@ -12,13 +12,20 @@ class GraphService {
     try {
       const token = await this.getAccessToken()
       
+      // Set default headers, but allow override (important for binary uploads)
+      const defaultHeaders = {
+        'Authorization': `Bearer ${token}`,
+        ...(options.headers || {})
+      }
+      
+      // Only set Content-Type to JSON if not explicitly provided
+      if (!options.headers || !options.headers['Content-Type']) {
+        defaultHeaders['Content-Type'] = 'application/json'
+      }
+      
       const response = await fetch(`${GRAPH_API_BASE}${url}`, {
         ...options,
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-          ...options.headers,
-        },
+        headers: defaultHeaders,
       })
 
       if (!response.ok) {
@@ -142,6 +149,93 @@ class GraphService {
         console.log('Todos file not found, nothing to delete')
         return
       }
+      throw error
+    }
+  }
+
+  // Upload photo to OneDrive
+  async uploadPhoto(photoBlob, fileName) {
+    try {
+      console.log(`Uploading photo: ${fileName} (${photoBlob.size} bytes)`)
+      
+      const response = await this.makeGraphRequest(`/me/drive/special/approot:/photos/${fileName}:/content`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'image/jpeg',
+        },
+        body: photoBlob,
+      })
+      
+      console.log('Photo uploaded successfully:', response)
+      return response
+    } catch (error) {
+      console.error('Error uploading photo to OneDrive:', error)
+      throw error
+    }
+  }
+
+  // Get photo download URL
+  async getPhotoUrl(fileName) {
+    try {
+      const response = await this.makeGraphRequest(`/me/drive/special/approot:/photos/${fileName}`)
+      return response['@microsoft.graph.downloadUrl']
+    } catch (error) {
+      if (error.message.includes('404')) {
+        console.log(`Photo not found: ${fileName}`)
+        return null
+      }
+      console.error('Error getting photo URL:', error)
+      throw error
+    }
+  }
+
+  // Get photo metadata
+  async getPhotoInfo(fileName) {
+    try {
+      const response = await this.makeGraphRequest(`/me/drive/special/approot:/photos/${fileName}`)
+      return {
+        fileName,
+        downloadUrl: response['@microsoft.graph.downloadUrl'],
+        lastModified: response.lastModifiedDateTime,
+        size: response.size,
+        id: response.id,
+      }
+    } catch (error) {
+      if (error.message.includes('404')) {
+        return null // Photo doesn't exist
+      }
+      throw error
+    }
+  }
+
+  // Delete photo
+  async deletePhoto(fileName) {
+    try {
+      await this.makeGraphRequest(`/me/drive/special/approot:/photos/${fileName}`, {
+        method: 'DELETE',
+      })
+      console.log(`Photo deleted: ${fileName}`)
+    } catch (error) {
+      if (error.message.includes('404')) {
+        console.log(`Photo not found for deletion: ${fileName}`)
+        return
+      }
+      console.error('Error deleting photo:', error)
+      throw error
+    }
+  }
+
+  // List all photos in the photos folder
+  async listPhotos() {
+    try {
+      const response = await this.makeGraphRequest('/me/drive/special/approot:/photos:/children')
+      return response.value || []
+    } catch (error) {
+      if (error.message.includes('404')) {
+        console.log('Photos folder not found, returning empty list')
+        return []
+      }
+      console.error('Error listing photos:', error)
       throw error
     }
   }

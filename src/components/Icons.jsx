@@ -207,3 +207,11 @@ export const BarChartIcon = (props) => (
     <line x1="6" y1="20" x2="6" y2="16" />
   </IconBase>
 )
+
+export const CameraIcon = (props) => (
+  <IconBase {...props} viewBox="0 0 24 24">
+    <path d="m14.5 4-1.5-2h-2l-1.5 2" />
+    <rect width="20" height="16" x="2" y="4" rx="2" />
+    <circle cx="12" cy="12" r="3" />
+  </IconBase>
+)

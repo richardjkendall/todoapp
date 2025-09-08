@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import Tag from './Tag'
 import ShareButton from './ShareButton'
+import LinkifiedText from './LinkifiedText'
 import { EditIcon, CheckIcon, UndoIcon, DeleteIcon, SaveIcon, CancelIcon } from './Icons'
 import { 
   TodoItem as StyledTodoItem, 
@@ -345,7 +346,7 @@ const TodoItem = ({
                   hasTags={todo.tags && todo.tags.length > 0}
                   completed={todo.completed}
                 >
-                  {todo.text}
+                  <LinkifiedText completed={todo.completed}>{todo.text}</LinkifiedText>
                 </TodoText>
                 {todo.tags && todo.tags.length > 0 && (
                   <TagContainer>

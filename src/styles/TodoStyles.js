@@ -635,6 +635,14 @@ export const TodoLeftColumn = styled.div`
 
 export const TodoContent = styled.div`
   flex: 1;
+  min-width: 0; /* Allows flex item to shrink below its content size */
+  overflow-wrap: break-word; /* Break long words if necessary */
+  word-wrap: break-word; /* Legacy support */
+  
+  @media (max-width: 767px) {
+    /* Ensure content can shrink to make room for actions */
+    flex-shrink: 1;
+  }
 `
 
 export const TodoHeader = styled.div`
@@ -852,6 +860,13 @@ export const TodoActions = styled.div`
   flex-shrink: 0;
   align-self: flex-start;
   padding-top: ${props => props.theme.spacing.xs};
+  min-width: 0; /* Allow content to shrink if needed */
+  
+  @media (max-width: 767px) {
+    /* On mobile, ensure actions don't push content off screen */
+    flex-shrink: 1;
+    min-width: 32px; /* Minimum space for share button */
+  }
 `
 
 export const ButtonGroup = styled.div`
