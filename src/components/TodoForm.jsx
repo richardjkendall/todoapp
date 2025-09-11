@@ -1,9 +1,12 @@
 import { useState, useRef, useEffect } from 'react'
 import { Form, FormRow, InputContainer, Textarea, Button } from '../styles/TodoStyles'
 import InputHelper from './InputHelper'
+import PhotoButton from './PhotoButton'
+import LongPressButton from './LongPressButton'
 import { PlusIcon, SearchIcon } from './Icons'
+import { isMobileDevice } from '../utils/deviceUtils'
 
-const TodoForm = ({ onAddTodo, onSearch, searchActive, onClearSearch }) => {
+const TodoForm = ({ onAddTodo, onSearch, searchActive, onClearSearch, onShowCamera, disabled = false }) => {
   const [inputValue, setInputValue] = useState('')
   const [isSearchMode, setIsSearchMode] = useState(false)
   const [isFocused, setIsFocused] = useState(false)
@@ -12,6 +15,8 @@ const TodoForm = ({ onAddTodo, onSearch, searchActive, onClearSearch }) => {
 
   const handleSubmit = (e) => {
     e.preventDefault()
+    if (disabled) return // Prevent submit when disabled
+    
     if (inputValue.trim()) {
       setShowHelper(false)
       if (isSearchMode) {
@@ -69,6 +74,27 @@ const TodoForm = ({ onAddTodo, onSearch, searchActive, onClearSearch }) => {
     }
   }
 
+  const handlePhotoAdded = (markdownRef) => {
+    if (!textareaRef.current) return
+    
+    const textarea = textareaRef.current
+    const cursorPos = textarea.selectionStart
+    const currentValue = inputValue
+    
+    // Insert photo markdown at cursor position
+    const newValue = currentValue.slice(0, cursorPos) + markdownRef + ' ' + currentValue.slice(cursorPos)
+    setInputValue(newValue)
+    
+    // Auto resize after adding photo
+    setTimeout(() => {
+      autoResize(textarea)
+      // Restore cursor position after the inserted text
+      textarea.focus()
+      const newCursorPos = cursorPos + markdownRef.length + 1
+      textarea.setSelectionRange(newCursorPos, newCursorPos)
+    }, 0)
+  }
+
   const autoResize = (textarea) => {
     textarea.style.height = 'auto'
     const lineHeight = 20 // approximate line height
@@ -95,15 +121,29 @@ const TodoForm = ({ onAddTodo, onSearch, searchActive, onClearSearch }) => {
               // Delay hiding to allow clicking on helper
               setTimeout(() => setShowHelper(false), 150)
             }}
-            placeholder={isSearchMode ? "Search todos... Type /search to search by text, #tag for tags, !1-!5 for priority, completed:true/false for status" : "Add a new todo... Use #tags and !1-!5 for priority, or type / to search"}
+            placeholder={disabled ? "Syncing..." : isSearchMode ? "Search todos... Type /search to search by text, #tag for tags, !1-!5 for priority, completed:true/false for status" : "Add a new todo... Use #tags and !1-!5 for priority, or type / to search"}
             rows={1}
+            disabled={disabled}
           />
           <InputHelper show={showHelper} isSearchMode={isSearchMode} inputRef={textareaRef} />
         </InputContainer>
       </FormRow>
-      <Button type="submit" title={isSearchMode ? 'Search' : 'Add Todo'}>
-        {isSearchMode ? <SearchIcon /> : <PlusIcon />}
-      </Button>
+      {/* Mobile: Long press button, Desktop: Separate buttons */}
+      {isMobileDevice() ? (
+        <LongPressButton
+          onPhotoAdded={handlePhotoAdded}
+          onShowCamera={onShowCamera}
+          isSearchMode={isSearchMode}
+          disabled={disabled}
+        />
+      ) : (
+        <>
+          <PhotoButton onPhotoAdded={handlePhotoAdded} disabled={disabled || isSearchMode} onShowCamera={onShowCamera} />
+          <Button type="submit" title={isSearchMode ? 'Search' : 'Add Todo'} disabled={disabled}>
+            {isSearchMode ? <SearchIcon /> : <PlusIcon />}
+          </Button>
+        </>
+      )}
     </Form>
   )
 }

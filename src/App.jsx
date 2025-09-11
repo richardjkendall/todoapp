@@ -20,6 +20,7 @@ import SharedTodoModal from './components/SharedTodoModal'
 import QuickFilters from './components/QuickFilters'
 import NotificationSettingsModal from './components/NotificationSettingsModal'
 import NotificationToggle from './components/NotificationToggle'
+import CameraCapture from './components/CameraCapture'
 import { useSharedTodo } from './hooks/useSharedTodo'
 import { 
   GlobalStyle, 
@@ -28,16 +29,75 @@ import {
   SearchIndicator,
   getTheme
 } from './styles/TodoStyles'
+import styled from 'styled-components'
+
+// Initial sync loader component
+const InitialSyncContainer = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: ${props => props.theme.spacing.xl};
+  text-align: center;
+  min-height: 300px;
+`
+
+const SyncSpinner = styled.div`
+  width: 40px;
+  height: 40px;
+  border: 3px solid ${props => props.theme.colors.border};
+  border-top: 3px solid ${props => props.theme.colors.primary};
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: ${props => props.theme.spacing.lg};
+  
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+`
+
+const SyncText = styled.div`
+  color: ${props => props.theme.colors.text.secondary};
+  font-size: ${props => props.theme.typography.fontSize.sm};
+  margin-bottom: ${props => props.theme.spacing.sm};
+`
+
+const SyncSubtext = styled.div`
+  color: ${props => props.theme.colors.text.tertiary};
+  font-size: ${props => props.theme.typography.fontSize.xs};
+`
+
+const InitialSyncLoader = ({ isAuthLoading, isLoaded, isInitialSyncing }) => (
+  <InitialSyncContainer>
+    <SyncSpinner />
+    <SyncText>
+      {isAuthLoading ? 'Loading...' : 
+       !isLoaded ? 'Loading your todos...' : 
+       isInitialSyncing ? 'Syncing with OneDrive...' : 
+       'Loading...'}
+    </SyncText>
+    <SyncSubtext>
+      {isAuthLoading ? 'Checking your account' :
+       !isLoaded ? 'Getting your data ready' :
+       isInitialSyncing ? 'Loading your latest todos' :
+       'Please wait'}
+    </SyncSubtext>
+  </InitialSyncContainer>
+)
 
 const AppContent = () => {
   const { isDark } = useTheme()
-  const { isAuthenticated } = useAuth()
+  const { isAuthenticated, isLoading: isAuthLoading } = useAuth()
   const theme = getTheme(isDark)
   const [headerIsSticky, setHeaderIsSticky] = useState(false)
   const [quickFilteredTodos, setQuickFilteredTodos] = useState(null)
   const [activeQuickFilters, setActiveQuickFilters] = useState(null)
   const [filterStats, setFilterStats] = useState(null)
   const [showNotificationSettings, setShowNotificationSettings] = useState(false)
+  const [showCameraCapture, setShowCameraCapture] = useState(false)
+  const [onPhotoCapture, setOnPhotoCapture] = useState(null)
+  const [isInitialSyncing, setIsInitialSyncing] = useState(false)
   
   // Handle shared todos from URLs
   const { sharedTodo, clearSharedTodo, acceptSharedTodo } = useSharedTodo()
@@ -62,7 +122,8 @@ const AppContent = () => {
     syncStatus,
     conflictInfo,
     isOnline,
-    queueStatus
+    queueStatus,
+    isLoaded
   } = useTodos()
 
   // Handle shared todo actions
@@ -108,6 +169,24 @@ const AppContent = () => {
   // Handle notification settings toggle
   const handleNotificationToggle = () => {
     setShowNotificationSettings(!showNotificationSettings)
+  }
+
+  // Handle camera modal
+  const handleShowCamera = (photoCallback) => {
+    setOnPhotoCapture(() => photoCallback)
+    setShowCameraCapture(true)
+  }
+
+  const handleCameraClose = () => {
+    setShowCameraCapture(false)
+    setOnPhotoCapture(null)
+  }
+
+  const handlePhotoCapture = (photoBlob) => {
+    if (onPhotoCapture) {
+      onPhotoCapture(photoBlob)
+    }
+    handleCameraClose()
   }
 
   // Handle notification filter requests
@@ -203,6 +282,19 @@ const AppContent = () => {
     }
   }, [searchActive, handleClearSearch])
 
+  // Track initial sync state - show loading only during first sync after auth when no data exists
+  useEffect(() => {
+    // Start loading when authenticated user starts syncing, app is loaded, but no data exists yet
+    if (isAuthenticated && isLoaded && syncStatus === 'syncing' && !isInitialSyncing && allTodos.length === 0) {
+      setIsInitialSyncing(true)
+    }
+    
+    // Stop loading when sync completes (success or error), user logs out, or we have data to show
+    if (isInitialSyncing && (syncStatus === 'synced' || syncStatus === 'error' || !isAuthenticated || allTodos.length > 0)) {
+      setIsInitialSyncing(false)
+    }
+  }, [syncStatus, isAuthenticated, isLoaded, isInitialSyncing, allTodos.length])
+
   return (
     <StyledThemeProvider theme={theme}>
       <GlobalStyle />
@@ -237,6 +329,8 @@ const AppContent = () => {
             onSearch={handleSearch}
             onClearSearch={handleClearSearch}
             searchActive={searchActive}
+            onShowCamera={handleShowCamera}
+            disabled={syncStatus === 'syncing'}
           />
         </StickyHeader>
         
@@ -263,7 +357,14 @@ const AppContent = () => {
         
         
         <ContentArea headerIsSticky={headerIsSticky}>
-          {!isAuthenticated && allTodos.length === 0 ? (
+          {/* Show loading during initial app/auth/data loading */}
+          {isAuthLoading || !isLoaded || isInitialSyncing ? (
+            <InitialSyncLoader 
+              isAuthLoading={isAuthLoading}
+              isLoaded={isLoaded}
+              isInitialSyncing={isInitialSyncing}
+            />
+          ) : !isAuthenticated && allTodos.length === 0 ? (
             <WelcomeScreen />
           ) : (
             <TodoList 
@@ -275,6 +376,7 @@ const AppContent = () => {
               onDeleteTodo={deleteTodo}
               onReorderTodos={reorderTodos}
               extractTagsAndText={extractTagsAndText}
+              disabled={syncStatus === 'syncing'}
               reconstructTextWithTags={reconstructTextWithTags}
               formatTimestamp={formatTimestamp}
               searchActive={searchActive || Boolean(quickFilteredTodos)}
@@ -308,6 +410,14 @@ const AppContent = () => {
         isVisible={showNotificationSettings}
         onClose={() => setShowNotificationSettings(false)}
       />
+      
+      {/* Camera Capture Modal */}
+      {showCameraCapture && (
+        <CameraCapture
+          onPhotoCapture={handlePhotoCapture}
+          onClose={handleCameraClose}
+        />
+      )}
       
       <ToastRenderer />
     </StyledThemeProvider>

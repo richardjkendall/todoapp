@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import Tag from './Tag'
 import ShareButton from './ShareButton'
+import LinkifiedText from './LinkifiedText'
 import { EditIcon, CheckIcon, UndoIcon, DeleteIcon, SaveIcon, CancelIcon } from './Icons'
 import { 
   TodoItem as StyledTodoItem, 
@@ -42,7 +43,8 @@ const TodoItem = ({
   searchActive,
   extractTagsAndText,
   reconstructTextWithTags,
-  formatTimestamp 
+  formatTimestamp,
+  disabled = false
 }) => {
   const [isEditing, setIsEditing] = useState(false)
   const [editValue, setEditValue] = useState('')
@@ -52,6 +54,7 @@ const TodoItem = ({
   const swipeContainerRef = useRef(null)
 
   const startEdit = () => {
+    if (disabled) return
     setIsEditing(true)
     setEditValue(reconstructTextWithTags(todo.text, todo.tags || [], todo.priority))
   }
@@ -62,6 +65,7 @@ const TodoItem = ({
   }
 
   const saveEdit = () => {
+    if (disabled) return
     onEditTodo(todo.id, editValue)
     setIsEditing(false)
     setEditValue('')
@@ -178,24 +182,28 @@ const TodoItem = ({
 
   // Swipe gesture handlers
   const handleSwipeComplete = () => {
+    if (disabled) return
     if (!todo.completed) {
       onToggleComplete(todo.id)
     }
   }
 
   const handleSwipeEdit = () => {
+    if (disabled) return
     if (!todo.completed) {
       startEdit()
     }
   }
 
   const handleSwipeUndo = () => {
+    if (disabled) return
     if (todo.completed) {
       onToggleComplete(todo.id) // Make incomplete (undo completion)
     }
   }
 
   const handleSwipeDelete = () => {
+    if (disabled) return
     if (todo.completed) {
       onDeleteTodo(todo.id) // Delete completed todo
     }
@@ -250,8 +258,8 @@ const TodoItem = ({
     setIsPrimaryTouchDevice(isTouchPrimary())
   }, [])
 
-  // Disable drag and drop on primary touch devices or during swipe/edit/search
-  const isDragDisabled = isPrimaryTouchDevice || isEditing || searchActive || (isAnimating && Math.abs(swipeOffset) > 50)
+  // Disable drag and drop on primary touch devices or during swipe/edit/search/sync
+  const isDragDisabled = disabled || isPrimaryTouchDevice || isEditing || searchActive || (isAnimating && Math.abs(swipeOffset) > 50)
 
   // Add non-passive touchmove listener to prevent scroll interference (primary touch devices only)
   useEffect(() => {
@@ -335,9 +343,10 @@ const TodoItem = ({
                 value={editValue}
                 onChange={handleEditChange}
                 onKeyDown={handleKeyPress}
-                placeholder="Edit todo... Use #tags and !1-!5 for priority (Ctrl+Enter to save)"
+                placeholder={disabled ? "Syncing..." : "Edit todo... Use #tags and !1-!5 for priority (Ctrl+Enter to save)"}
                 rows={1}
-                autoFocus
+                autoFocus={!disabled}
+                disabled={disabled}
               />
             ) : (
               <>
@@ -345,7 +354,7 @@ const TodoItem = ({
                   hasTags={todo.tags && todo.tags.length > 0}
                   completed={todo.completed}
                 >
-                  {todo.text}
+                  <LinkifiedText completed={todo.completed}>{todo.text}</LinkifiedText>
                 </TodoText>
                 {todo.tags && todo.tags.length > 0 && (
                   <TagContainer>
@@ -367,20 +376,21 @@ const TodoItem = ({
               <ButtonGroup>
                 {isEditing ? (
                   <>
-                    <EditButton onClick={saveEdit} title="Save"><SaveIcon /></EditButton>
+                    <EditButton onClick={saveEdit} title="Save" disabled={disabled}><SaveIcon /></EditButton>
                     <CancelButton onClick={cancelEdit} title="Cancel"><CancelIcon /></CancelButton>
                   </>
                 ) : (
                   <>
                     {todo.completed ? (
-                      <DeleteButton onClick={() => onDeleteTodo(todo.id)} title="Delete"><DeleteIcon /></DeleteButton>
+                      <DeleteButton onClick={() => disabled ? null : onDeleteTodo(todo.id)} title="Delete" disabled={disabled}><DeleteIcon /></DeleteButton>
                     ) : (
-                      <EditButton onClick={startEdit} title="Edit"><EditIcon /></EditButton>
+                      <EditButton onClick={startEdit} title="Edit" disabled={disabled}><EditIcon /></EditButton>
                     )}
                     <CompleteButton 
                       completed={todo.completed}
-                      onClick={() => onToggleComplete(todo.id)}
+                      onClick={() => disabled ? null : onToggleComplete(todo.id)}
                       title={todo.completed ? 'Mark as incomplete' : 'Mark as complete'}
+                      disabled={disabled}
                     >
                       {todo.completed ? <UndoIcon /> : <CheckIcon />}
                     </CompleteButton>

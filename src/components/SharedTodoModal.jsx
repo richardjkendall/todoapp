@@ -1,6 +1,7 @@
 import styled from 'styled-components'
 import { CheckIcon, CancelIcon } from './Icons'
 import { getPriorityColor } from '../utils/priority'
+import LinkifiedText from './LinkifiedText'
 
 const ModalOverlay = styled.div`
   position: fixed;
@@ -172,7 +173,7 @@ const SharedTodoModal = ({ sharedTodo, onAccept, onDecline }) => {
         </SharedFrom>
         
         <TodoPreview>
-          <TodoText>{sharedTodo.text}</TodoText>
+          <TodoText><LinkifiedText>{sharedTodo.text}</LinkifiedText></TodoText>
           
           {(sharedTodo.priority || sharedTodo.tags?.length > 0) && (
             <TodoMeta>
