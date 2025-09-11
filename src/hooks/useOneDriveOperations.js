@@ -218,10 +218,14 @@ export const useOneDriveOperations = () => {
       if (!graphService) return null
 
       const remoteResult = await graphService.readTodos()
-      const remoteTodos = remoteResult?.todos || remoteResult || []
+      const allRemoteTodos = remoteResult?.todos || remoteResult || []
+      
+      // Filter out tombstones for conflict UI - we only want to show active todos in the count
+      const remoteTodos = allRemoteTodos.filter(todo => !todo.deleted)
+      const localActiveTodos = localTodos.filter(todo => !todo.deleted)
       
       return {
-        local: localTodos,
+        local: localActiveTodos,
         remote: remoteTodos,
         timestamp: Date.now()
       }

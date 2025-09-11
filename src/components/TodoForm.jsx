@@ -6,7 +6,7 @@ import LongPressButton from './LongPressButton'
 import { PlusIcon, SearchIcon } from './Icons'
 import { isMobileDevice } from '../utils/deviceUtils'
 
-const TodoForm = ({ onAddTodo, onSearch, searchActive, onClearSearch, onShowCamera }) => {
+const TodoForm = ({ onAddTodo, onSearch, searchActive, onClearSearch, onShowCamera, disabled = false }) => {
   const [inputValue, setInputValue] = useState('')
   const [isSearchMode, setIsSearchMode] = useState(false)
   const [isFocused, setIsFocused] = useState(false)
@@ -15,6 +15,8 @@ const TodoForm = ({ onAddTodo, onSearch, searchActive, onClearSearch, onShowCame
 
   const handleSubmit = (e) => {
     e.preventDefault()
+    if (disabled) return // Prevent submit when disabled
+    
     if (inputValue.trim()) {
       setShowHelper(false)
       if (isSearchMode) {
@@ -119,8 +121,9 @@ const TodoForm = ({ onAddTodo, onSearch, searchActive, onClearSearch, onShowCame
               // Delay hiding to allow clicking on helper
               setTimeout(() => setShowHelper(false), 150)
             }}
-            placeholder={isSearchMode ? "Search todos... Type /search to search by text, #tag for tags, !1-!5 for priority, completed:true/false for status" : "Add a new todo... Use #tags and !1-!5 for priority, or type / to search"}
+            placeholder={disabled ? "Syncing..." : isSearchMode ? "Search todos... Type /search to search by text, #tag for tags, !1-!5 for priority, completed:true/false for status" : "Add a new todo... Use #tags and !1-!5 for priority, or type / to search"}
             rows={1}
+            disabled={disabled}
           />
           <InputHelper show={showHelper} isSearchMode={isSearchMode} inputRef={textareaRef} />
         </InputContainer>
@@ -131,12 +134,12 @@ const TodoForm = ({ onAddTodo, onSearch, searchActive, onClearSearch, onShowCame
           onPhotoAdded={handlePhotoAdded}
           onShowCamera={onShowCamera}
           isSearchMode={isSearchMode}
-          disabled={false}
+          disabled={disabled}
         />
       ) : (
         <>
-          <PhotoButton onPhotoAdded={handlePhotoAdded} disabled={isSearchMode} onShowCamera={onShowCamera} />
-          <Button type="submit" title={isSearchMode ? 'Search' : 'Add Todo'}>
+          <PhotoButton onPhotoAdded={handlePhotoAdded} disabled={disabled || isSearchMode} onShowCamera={onShowCamera} />
+          <Button type="submit" title={isSearchMode ? 'Search' : 'Add Todo'} disabled={disabled}>
             {isSearchMode ? <SearchIcon /> : <PlusIcon />}
           </Button>
         </>

@@ -13,7 +13,8 @@ const TodoList = ({
   extractTagsAndText,
   reconstructTextWithTags,
   formatTimestamp,
-  searchActive
+  searchActive,
+  disabled = false
 }) => {
   const sortedTodos = [...todos].sort((a, b) => {
     // First: incomplete todos before completed
@@ -59,6 +60,7 @@ const TodoList = ({
           extractTagsAndText={extractTagsAndText}
           reconstructTextWithTags={reconstructTextWithTags}
           formatTimestamp={formatTimestamp}
+          disabled={disabled}
         />
       ))}
     </StyledTodoList>
