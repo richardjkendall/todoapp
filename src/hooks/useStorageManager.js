@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
+import { storageLogger } from '../utils/logger'
 
 const STORAGE_TYPES = {
   LOCAL: 'localStorage',
@@ -22,7 +23,7 @@ export const useStorageManager = () => {
    */
   const switchStorageType = useCallback((type) => {
     if (type === STORAGE_TYPES.ONEDRIVE && !isAuthenticated) {
-      console.warn('Cannot switch to OneDrive storage when not authenticated')
+      storageLogger.warn('Cannot switch to OneDrive storage when not authenticated')
       return false
     }
     
@@ -36,7 +37,7 @@ export const useStorageManager = () => {
    */
   useEffect(() => {
     if (isAuthenticated && !localStorage.getItem('preferredStorageType')) {
-      console.log('Auto-switching to OneDrive mode for authenticated user')
+      storageLogger.debug('Auto-switching to OneDrive mode for authenticated user')
       setStorageType(STORAGE_TYPES.ONEDRIVE)
       localStorage.setItem('preferredStorageType', STORAGE_TYPES.ONEDRIVE)
     }

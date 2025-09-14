@@ -22,6 +22,7 @@ import NotificationSettingsModal from './components/NotificationSettingsModal'
 import NotificationToggle from './components/NotificationToggle'
 import CameraCapture from './components/CameraCapture'
 import { useSharedTodo } from './hooks/useSharedTodo'
+import { appLogger } from './utils/logger'
 import { 
   GlobalStyle, 
   Container, 
@@ -191,11 +192,11 @@ const AppContent = () => {
 
   // Handle notification filter requests
   const handleNotificationFilter = (filterParams) => {
-    console.log('handleNotificationFilter called with:', filterParams)
+    appLogger.debug('handleNotificationFilter called', { filterParams })
     
     // Clear any existing search first
     if (searchActive) {
-      console.log('Clearing search before applying notification filter')
+      appLogger.debug('Clearing search before applying notification filter')
       handleClearSearch()
     }
     
@@ -211,20 +212,20 @@ const AppContent = () => {
     }
     
     const filterName = filterMap[filterParams]
-    console.log('Mapped filter params to filter name:', { filterParams, filterName })
+    appLogger.debug('Mapped filter params to filter name', { filterParams, filterName })
     
     if (filterName) {
       // Simulate clicking the appropriate quick filter
-      console.log('Dispatching quick-filter-select event')
+      appLogger.debug('Dispatching quick-filter-select event')
       setTimeout(() => {
         const filterEvent = new CustomEvent('quick-filter-select', {
           detail: { filterName, filterParams }
         })
         window.dispatchEvent(filterEvent)
-        console.log('quick-filter-select event dispatched:', { filterName, filterParams })
+        appLogger.debug('quick-filter-select event dispatched', { filterName, filterParams })
       }, 100)
     } else {
-      console.warn('No matching filter found for params:', filterParams)
+      appLogger.warn('No matching filter found for params', { filterParams })
     }
   }
 
@@ -244,12 +245,12 @@ const AppContent = () => {
 
     // Handle service worker messages from notifications
     const handleServiceWorkerMessage = (event) => {
-      console.log('Service worker message received:', event.data)
+      appLogger.debug('Service worker message received', { data: event.data })
       
       if (event.data?.type === 'NOTIFICATION_ACTION') {
         const { filterParams, action, notificationType } = event.data
         
-        console.log('Processing notification action:', {
+        appLogger.debug('Processing notification action', {
           action,
           notificationType,
           filterParams,
@@ -261,13 +262,13 @@ const AppContent = () => {
         }
         
         // Log the notification interaction
-        console.log('Notification action processed:', {
+        appLogger.info('Notification action processed', {
           action,
           notificationType,
           filterParams
         })
       } else {
-        console.log('Unknown service worker message type:', event.data?.type)
+        appLogger.warn('Unknown service worker message type', { type: event.data?.type })
       }
     }
 

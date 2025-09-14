@@ -7,6 +7,7 @@ import React, { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import styled from 'styled-components'
 import { usePhotoService } from '../hooks/usePhotoService'
+import { appLogger } from '../utils/logger'
 
 const ImageContainer = styled.div`
   position: relative;
@@ -169,14 +170,14 @@ const TodoImage = ({
         throw new Error('Invalid photo reference')
       }
 
-      console.log('Loading photo:', filename)
+      appLogger.debug('Loading photo from OneDrive', { filename })
       
       // Get photo URL from OneDrive
       const url = await photoService.getPhotoUrl(filename)
       setImageUrl(url)
       
     } catch (err) {
-      console.error('Failed to load photo:', err)
+      appLogger.error('Failed to load photo from OneDrive', { filename, error: err.message })
       setError(err.message || 'Failed to load photo')
     } finally {
       setLoading(false)
@@ -209,11 +210,11 @@ const TodoImage = ({
   }
 
   const handleImageLoad = () => {
-    console.log('Image loaded successfully:', src)
+    appLogger.debug('Image loaded successfully', { imageUrl })
   }
 
   const handleImageError = () => {
-    console.error('Image failed to load:', src)
+    appLogger.warn('Image failed to load', { imageUrl })
     setError('Failed to display photo')
   }
 

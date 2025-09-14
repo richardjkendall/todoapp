@@ -1,6 +1,7 @@
 /**
  * Shared OneDrive error handling utilities
  */
+import { syncLogger } from './logger'
 
 // Common OneDrive error types
 export const ERROR_TYPES = {
@@ -148,7 +149,7 @@ export const getRetryDelay = (error, attemptCount = 0) => {
 export const logError = (error, operation, context = {}) => {
   const errorType = classifyError(error)
   
-  console.error(`OneDrive ${operation} failed:`, {
+  syncLogger.error(`OneDrive ${operation} failed`, {
     type: errorType,
     message: error.message,
     code: error.code || error.status,

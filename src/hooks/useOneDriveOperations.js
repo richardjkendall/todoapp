@@ -1,9 +1,10 @@
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useToastContext } from '../context/ToastContext'
 import GraphService from '../services/graphService'
 import { withErrorHandling, getErrorMessage, logError } from '../utils/oneDriveErrorHandling'
 import { smartSyncResolve, createSmartConflictInfo, filterActiveTodos, cleanupOldTombstones } from '../utils/smartSyncConflictDetection'
+import { syncLogger } from '../utils/logger'
 
 /**
  * Core OneDrive operations hook - handles save, load, and conflict resolution
@@ -26,7 +27,7 @@ export const useOneDriveOperations = () => {
    */
   const markAsDeleted = useCallback((todoId) => {
     deletedTodoIdsRef.current.add(todoId)
-    console.log(`🗑️ Todo ${todoId} marked as deleted locally`)
+    syncLogger.debug('Todo marked as deleted locally', { todoId })
   }, [])
 
   /**
@@ -34,7 +35,7 @@ export const useOneDriveOperations = () => {
    */
   const clearDeletedTracking = useCallback(() => {
     deletedTodoIdsRef.current.clear()
-    console.log('✅ Cleared deletion tracking after sync')
+    syncLogger.debug('Cleared deletion tracking after sync')
   }, [])
 
   /**
@@ -42,9 +43,7 @@ export const useOneDriveOperations = () => {
    */
   const checkForRemoteConflicts = useCallback(async (localTodos, graphService) => {
     try {
-      console.log('🧠 Smart sync conflict check...', {
-        localCount: localTodos.length
-      })
+      syncLogger.debug('Smart sync conflict check', { localCount: localTodos.length })
       
       // Load current remote state (includes tombstones)
       const remoteResult = await graphService.readTodos()
@@ -52,7 +51,7 @@ export const useOneDriveOperations = () => {
       
       // If no remote data exists, just use local data
       if (!allRemoteTodos || allRemoteTodos.length === 0) {
-        console.log('✅ No remote data - using local todos')
+        syncLogger.debug('No remote data - using local todos')
         return { resolved: localTodos }
       }
       
@@ -60,29 +59,37 @@ export const useOneDriveOperations = () => {
       const result = smartSyncResolve(localTodos, allRemoteTodos, deletedTodoIdsRef.current)
       
       if (result.hasConflicts) {
-        console.log(`⚠️ Found ${result.conflicts.length} true simultaneous conflicts`)
+        syncLogger.warn('Found true simultaneous conflicts', { conflictCount: result.conflicts.length })
         return {
           conflicts: createSmartConflictInfo(result.conflicts, localTodos, allRemoteTodos)
         }
       } else {
-        console.log(`✅ Smart sync complete - resolved ${result.resolved.length} todos automatically`)
+        syncLogger.debug('Smart sync complete - resolved todos automatically', { 
+          resolvedCount: result.resolved.length 
+        })
         return {
           resolved: result.resolved
         }
       }
       
     } catch (error) {
-      console.error('Error in smart sync check:', error)
+      syncLogger.error('Error in smart sync check', { error: error.message })
       throw new Error(`Smart sync failed: ${error.message}`)
     }
   }, [])
 
-  // Create graph service instance
+  // Create graph service instance using module-level singleton
   const createGraphService = useCallback(() => {
     if (!isAuthenticated || !isInitialized) return null
-    // Pass the getAccessToken function, not the token itself
-    return new GraphService(getAccessToken)
+    return GraphService.getInstance(getAccessToken)
   }, [isAuthenticated, isInitialized, getAccessToken])
+  
+  // Clear singleton when auth changes
+  useEffect(() => {
+    if (!isAuthenticated) {
+      GraphService.clearInstance()
+    }
+  }, [isAuthenticated])
 
   /**
    * Save todos to OneDrive immediately
@@ -101,11 +108,11 @@ export const useOneDriveOperations = () => {
         if (!graphService) throw new Error('Unable to create Graph service')
 
         // Smart sync with timestamp-based conflict detection
-        console.log('🧠 Smart sync before save...', { todosCount: todos.length })
+        syncLogger.debug('Smart sync before save', { todosCount: todos.length })
         const syncResult = await checkForRemoteConflicts(todos, graphService)
         
         if (syncResult?.conflicts) {
-          console.log('⚠️ True conflicts detected - simultaneous edits need resolution')
+          syncLogger.warn('True conflicts detected - simultaneous edits need resolution')
           setConflictInfo(syncResult.conflicts)
           return null // Don't save, let user resolve conflicts first
         }
@@ -183,16 +190,23 @@ export const useOneDriveOperations = () => {
         // Update tracking data with ALL todos (including tombstones for sync)
         lastSavedDataRef.current = allTodos
         
-        console.log(`📥 Loaded: ${activeTodos.length} active todos, ${allTodos.length - activeTodos.length} tombstones`)
+        syncLogger.debug('Loaded todos from OneDrive', { 
+          activeTodos: activeTodos.length, 
+          tombstones: allTodos.length - activeTodos.length 
+        })
         
-        // Return only active todos for the UI
-        return { todos: activeTodos, lastModified }
+        // Return both active todos for UI and complete data for sync
+        return { 
+          todos: activeTodos, 
+          lastModified,
+          completeTodos: allTodos  // Include complete data with tombstones
+        }
       } catch (err) {
         logError(err, 'load')
         
         // File not found is acceptable for initial setup
         if (err.status === 404) {
-          return []
+          return { todos: [], lastModified: null, completeTodos: [] }
         }
         
         showError(`Failed to load from OneDrive: ${getErrorMessage(err)}`)

@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect, useRef } from 'react'
 import { useOfflineDetection } from './useOfflineDetection'
 import { useSyncQueue } from './useSyncQueue'
 import { useOneDriveOperations } from './useOneDriveOperations'
+import { syncLogger } from '../utils/logger'
 
 /**
  * Sync management hook - handles sync status, timing, and coordination
@@ -29,10 +30,10 @@ export const useSyncManager = (isOneDriveMode) => {
       clearTimeout(debounceTimeoutRef.current)
     }
     
-    // Randomized delay to prevent multiple tabs from conflicting
-    const baseDelay = 2000
-    const randomDelay = Math.random() * 1000
-    const delay = baseDelay + randomDelay
+    // Optimized delay for better user experience while preventing conflicts
+    const baseDelay = 500  // Reduced from 2000ms to 500ms
+    const randomDelay = Math.random() * 200  // Reduced from 1000ms to 200ms
+    const delay = baseDelay + randomDelay  // Now 500-700ms instead of 2000-3000ms
     
     debounceTimeoutRef.current = setTimeout(async () => {
       if (isProcessingRef.current) return
@@ -56,7 +57,7 @@ export const useSyncManager = (isOneDriveMode) => {
           setSyncStatus('queued')
         }
       } catch (error) {
-        console.error('Debounced save failed:', error)
+        syncLogger.error('Debounced save failed', { error: error.message })
         setSyncStatus('error')
       } finally {
         isProcessingRef.current = false
@@ -82,13 +83,13 @@ export const useSyncManager = (isOneDriveMode) => {
           case 'LOAD_TODOS':
             return await oneDriveOps.loadFromOneDrive()
           default:
-            console.warn('Unknown queued operation type:', operation.type)
+            syncLogger.warn('Unknown queued operation type', { type: operation.type })
         }
       })
       
       setSyncStatus('synced')
     } catch (error) {
-      console.error('Failed to process sync queue:', error)
+      syncLogger.error('Failed to process sync queue', { error: error.message })
       setSyncStatus('error')
     }
   }, [isOnline, isOneDriveMode, queueStatus.count, processQueue, oneDriveOps])
@@ -148,7 +149,7 @@ export const useSyncManager = (isOneDriveMode) => {
         setSyncStatus('queued')
       }
     } catch (error) {
-      console.error('Immediate save failed:', error)
+      syncLogger.error('Immediate save failed', { error: error.message })
       setSyncStatus('error')
       throw error
     }
@@ -177,7 +178,7 @@ export const useSyncManager = (isOneDriveMode) => {
         return []
       }
     } catch (error) {
-      console.error('Load failed:', error)
+      syncLogger.error('Load failed', { error: error.message })
       setSyncStatus('error')
       throw error
     }

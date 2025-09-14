@@ -11,6 +11,7 @@ import { Button } from '../styles/TodoStyles'
 import { isMobileDevice, hasCameraSupport } from '../utils/deviceUtils'
 import { usePhotoService } from '../hooks/usePhotoService'
 import { useToastContext } from '../context/ToastContext'
+import { appLogger } from '../utils/logger'
 
 const ButtonContainer = styled.div`
   position: relative;
@@ -34,11 +35,12 @@ const ContextMenu = styled.div`
   transform: ${props => props.show ? 'scale(1)' : 'scale(0.9)'};
   pointer-events: ${props => props.show ? 'auto' : 'none'};
   transition: all 0.2s cubic-bezier(0.4, 0.0, 0.2, 1);
-  z-index: 10001; /* Higher than other modals */
+  z-index: ${props => props.show ? 10001 : -1}; /* Only use high z-index when actually shown */
+  display: ${props => props.show ? 'block' : 'none'}; /* Completely hide when not shown */
   
-  /* Ensure all child elements are clickable */
+  /* Ensure all child elements are clickable only when shown */
   * {
-    pointer-events: auto;
+    pointer-events: ${props => props.show ? 'auto' : 'none'};
   }
   
   /* Arrow pointing up */
@@ -130,19 +132,26 @@ const LongPressButton = ({
   // Close menu when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
+      // More specific checks to avoid interfering with other UI elements
       if (buttonRef.current && 
           !buttonRef.current.contains(event.target) &&
-          !event.target.closest('[data-context-menu]')) {
+          !event.target.closest('[data-context-menu]') &&
+          !event.target.closest('[data-testid*="filter-"]') && // Avoid filter buttons
+          !event.target.closest('.filter-chip') && // Avoid filter chips
+          !event.target.closest('button[data-testid]')) { // Avoid other test buttons
         setShowMenu(false)
       }
     }
 
     if (showMenu) {
-      document.addEventListener('click', handleClickOutside)
+      // Use capture phase and add a small delay to avoid conflicts
+      setTimeout(() => {
+        document.addEventListener('click', handleClickOutside, true)
+      }, 100)
     }
 
     return () => {
-      document.removeEventListener('click', handleClickOutside)
+      document.removeEventListener('click', handleClickOutside, true)
     }
   }, [showMenu])
 
@@ -151,7 +160,7 @@ const LongPressButton = ({
     const button = buttonRef.current
     if (!button || !isMobileDevice()) return
 
-    const handleTouchStart = (e) => {
+    const handleTouchStart = () => {
       if (disabled) return
       
       // Don't prevent default - allow regular clicks to work
@@ -239,7 +248,6 @@ const LongPressButton = ({
   }
 
   const handlePhotoAction = async () => {
-    console.log('Photo action clicked!')
     setShowMenu(false)
     
     if (!photoService) {
@@ -250,7 +258,7 @@ const LongPressButton = ({
     if (onShowCamera) {
       const handlePhotoCapture = async (photoBlob) => {
         try {
-          console.log('Starting photo upload...', { 
+          appLogger.debug('Starting photo upload from long press menu', { 
             size: photoBlob.size,
             type: photoBlob.type 
           })
@@ -269,7 +277,7 @@ const LongPressButton = ({
           onPhotoAdded(result.markdown)
           
         } catch (error) {
-          console.error('Photo upload failed:', error)
+          appLogger.error('Photo upload failed from long press menu', { error: error.message })
           showError(`Failed to upload photo: ${error.message}`)
         }
       }
@@ -299,13 +307,11 @@ const LongPressButton = ({
         {cameraAvailable && !isSearchMode && (
           <ContextMenuItem 
             onClick={(e) => {
-              console.log('Context menu item clicked')
               e.preventDefault()
               e.stopPropagation()
               handlePhotoAction()
             }}
             onTouchEnd={(e) => {
-              console.log('Context menu item touched')
               e.preventDefault()
               e.stopPropagation()
               handlePhotoAction()

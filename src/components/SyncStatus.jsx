@@ -2,6 +2,7 @@ import { useState } from 'react'
 import styled from 'styled-components'
 import { useAuth } from '../context/AuthContext'
 import SyncStatusIndicator from './SyncStatusIndicator'
+import { authLogger } from '../utils/logger'
 import UserAvatar from './UserAvatar'
 import { SignInIcon, SignOutIcon } from './Icons'
 
@@ -67,7 +68,7 @@ const SyncStatus = ({
         await login()
       }
     } catch (error) {
-      console.error('Auth toggle failed:', error)
+      authLogger.error('Auth toggle failed', { error: error.message })
     }
   }
 

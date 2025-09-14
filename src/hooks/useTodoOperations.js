@@ -1,5 +1,6 @@
 import { useCallback } from 'react'
 import { createTodo, isValidTodo, normalizeTodo } from '../utils/todoValidation'
+import { appLogger } from '../utils/logger'
 import { useTodoTextParser } from './useTodoTextParser'
 import { touchTodo } from '../utils/smartSyncConflictDetection'
 
@@ -144,7 +145,7 @@ export const useTodoOperations = (todos, setTodos, onUserChange, onTodoDeleted) 
 
       return newTodos.length
     } catch (error) {
-      console.error('Import failed:', error)
+      appLogger.error('Import failed', { error: error.message })
       throw error
     }
   }, [todos, setTodos, onUserChange])
