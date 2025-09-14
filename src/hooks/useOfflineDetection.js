@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { syncLogger } from '../utils/logger'
 
 export const useOfflineDetection = () => {
   const [isOnline, setIsOnline] = useState(navigator.onLine)
@@ -6,13 +7,13 @@ export const useOfflineDetection = () => {
 
   useEffect(() => {
     const handleOnline = () => {
-      console.log('App went online')
+      syncLogger.debug('App went online')
       setWasOffline(!isOnline) // Track if we were offline before
       setIsOnline(true)
     }
 
     const handleOffline = () => {
-      console.log('App went offline')
+      syncLogger.debug('App went offline')
       setIsOnline(false)
     }
 

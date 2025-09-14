@@ -130,57 +130,52 @@ const useTodos = () => {
    */
   const syncOnModeChange = useCallback(async () => {
     if (!isAuthenticated || !isLoaded) {
-      console.log('Skipping sync - not ready:', { isAuthenticated, isLoaded })
+      syncLogger.debug('Skipping sync - not ready', { isAuthenticated, isLoaded })
       return
     }
 
     try {
-      // Load from OneDrive to check for any existing data
-      console.log('Loading from OneDrive...')
+      // Load from OneDrive to check for any existing data (single call gets both active and complete data)
+      syncLogger.debug('Loading from OneDrive...')
       const oneDriveResult = await loadFromOneDrive()
       const oneDriveActiveTodos = oneDriveResult?.todos || oneDriveResult || []
       const oneDriveLastModified = oneDriveResult?.lastModified || null
+      const oneDriveCompleteTodos = oneDriveResult?.completeTodos || oneDriveActiveTodos || []
       
-      // Also load complete OneDrive data (including tombstones) for smart sync
-      const graphService = createGraphService ? createGraphService() : null
-      let oneDriveCompleteTodos = []
-      if (graphService) {
-        try {
-          const completeResult = await graphService.readTodos()
-          oneDriveCompleteTodos = completeResult?.todos || completeResult || []
-          console.log(`📊 OneDrive complete data: ${oneDriveCompleteTodos.length} total (${oneDriveActiveTodos.length} active)`)
-        } catch (error) {
-          console.error('Failed to load complete OneDrive data:', error)
-          oneDriveCompleteTodos = oneDriveActiveTodos // Fallback to active todos only
-        }
-      } else {
-        oneDriveCompleteTodos = oneDriveActiveTodos // Fallback if no graph service
-      }
+      syncLogger.debug('OneDrive data loaded', { 
+        total: oneDriveCompleteTodos.length, 
+        active: oneDriveActiveTodos.length 
+      })
       
       const currentLocalTodos = todos // Use current todos state, not loadTodos()
       
-      console.log('OneDrive todos:', oneDriveActiveTodos?.length || 0, 'Local todos:', currentLocalTodos?.length || 0)
+      syncLogger.debug('Sync comparison', { 
+        oneDrive: oneDriveActiveTodos?.length || 0, 
+        local: currentLocalTodos?.length || 0 
+      })
       
       if (oneDriveActiveTodos && oneDriveActiveTodos.length > 0) {
         // OneDrive has data - use smart merge to detect real conflicts
         if (currentLocalTodos.length === 0) {
           // Local is empty, use OneDrive data
-          console.log('Local empty, loading OneDrive data')
+          syncLogger.debug('Local empty, loading OneDrive data')
           setIsSyncing(true)
           setTodos(oneDriveActiveTodos)
           localStorage.setItem('todos', JSON.stringify(oneDriveActiveTodos))
           setIsSyncing(false)
         } else {
           // Both have data - perform smart sync
-          console.log('Performing smart sync of local and OneDrive data')
+          syncLogger.debug('Performing smart sync of local and OneDrive data')
           const { smartSyncResolve, createSmartConflictInfo } = await import('../utils/smartSyncConflictDetection')
           const syncResult = smartSyncResolve(currentLocalTodos, oneDriveCompleteTodos)
           
-          console.log('Smart sync result:', syncResult.summary)
+          syncLogger.debug('Smart sync result', syncResult.summary)
           
           if (syncResult.hasConflicts) {
             // True simultaneous conflicts - show resolution UI
-            console.log('Simultaneous edit conflicts detected:', syncResult.conflicts.length)
+            syncLogger.warn('Simultaneous edit conflicts detected', { 
+              conflictCount: syncResult.conflicts.length 
+            })
             
             setLocalConflictInfo(createSmartConflictInfo(
               syncResult.conflicts,
@@ -212,7 +207,7 @@ const useTodos = () => {
       } else {
         // OneDrive is empty, migrate local data if it exists
         if (currentLocalTodos.length > 0) {
-          console.log('OneDrive empty, migrating local data')
+          syncLogger.debug('OneDrive empty, migrating local data')
           setIsSyncing(true)
           const migratedTodos = await migrateToOneDrive(currentLocalTodos)
           if (migratedTodos && migratedTodos.length > 0) {
@@ -223,7 +218,7 @@ const useTodos = () => {
         }
       }
     } catch (error) {
-      console.error('Sync on mode change failed:', error)
+      syncLogger.error('Sync on mode change failed', { error: error.message })
       // Keep current local data on error
     }
   }, [isAuthenticated, isLoaded, todos, migrateToOneDrive, loadFromOneDrive])
@@ -235,7 +230,7 @@ const useTodos = () => {
     try {
       // Handle conflicts from new smart sync system
       if (localConflictInfo && localConflictInfo.type === 'smart-sync-conflict') {
-        console.log('🧠 Resolving smart sync conflicts:', resolution)
+        syncLogger.debug('Resolving smart sync conflicts', { resolution })
         
         // Start with the resolved todos from the conflict detection
         let finalTodos = [...(localConflictInfo.local || todos)]
@@ -250,18 +245,27 @@ const useTodos = () => {
             case 'local':
             case 'use_local':
               resolvedTodo = conflict.local
-              console.log(`Using local version for todo ${conflict.id}: "${conflict.local.text}"`)
+              syncLogger.debug('Using local version for conflict', { 
+                todoId: conflict.id, 
+                text: conflict.local.text 
+              })
               break
             case 'remote':
             case 'use_remote':
               resolvedTodo = conflict.remote
-              console.log(`Using remote version for todo ${conflict.id}: "${conflict.remote.text}"`)
+              syncLogger.debug('Using remote version for conflict', { 
+                todoId: conflict.id, 
+                text: conflict.remote.text 
+              })
               break
             case 'merge':
             case 'field-based':
               // For simplified system, selectedTodos should contain resolved todos
               resolvedTodo = selectedTodos?.find(t => t.id === conflict.id) || conflict.local
-              console.log(`Using merged version for todo ${conflict.id}: "${resolvedTodo.text}"`)
+              syncLogger.debug('Using merged version for conflict', { 
+                todoId: conflict.id, 
+                text: resolvedTodo.text 
+              })
               break
             default:
               throw new Error(`Invalid conflict resolution option: ${resolution}`)
@@ -281,9 +285,9 @@ const useTodos = () => {
         // Save resolved todos directly - smart sync won't re-conflict since we resolved them
         try {
           await saveImmediately(finalTodos, false) // Use immediate save to bypass smart sync checks
-          console.log('✅ Smart sync conflict resolution saved successfully')
+          syncLogger.info('Smart sync conflict resolution saved successfully')
         } catch (error) {
-          console.error('❌ Failed to save smart sync resolution:', error)
+          syncLogger.error('Failed to save smart sync resolution', { error: error.message })
           throw error
         }
         
@@ -305,7 +309,7 @@ const useTodos = () => {
         }
       }
     } catch (error) {
-      console.error('Conflict resolution failed:', error)
+      syncLogger.error('Conflict resolution failed', { error: error.message })
       throw error
     }
   }, [resolveConflict, localConflictInfo, saveImmediately, todos])
@@ -322,7 +326,7 @@ const useTodos = () => {
       localStorage.setItem('todos', JSON.stringify(activeTodos))
       return activeTodos
     } catch (error) {
-      console.error('Migration failed:', error)
+      syncLogger.error('Migration failed', { error: error.message })
       throw error
     }
   }, [migrateToOneDrive])
@@ -368,10 +372,10 @@ const useTodos = () => {
         }, 500)
         return () => clearTimeout(timeoutId)
       } else {
-        console.log('Todos unchanged - skipping auto-save')
+        syncLogger.debug('Todos unchanged - skipping auto-save')
       }
     } else if (isSyncing) {
-      console.log('Skipping auto-save - currently syncing')
+      syncLogger.debug('Skipping auto-save - currently syncing')
     }
   }, [todos, isLoaded, isSyncing])
 
@@ -387,11 +391,15 @@ const useTodos = () => {
     
     // Only sync if authentication state actually changed and we're now authenticated and loaded
     if (isLoaded && isAuthenticated && prevAuth !== isAuthenticated) {
-      console.log('Authentication changed - triggering sync')
+      syncLogger.debug('Authentication changed - triggering sync')
       const timeoutId = setTimeout(syncOnModeChangeRef.current, 1000)
       return () => clearTimeout(timeoutId)
     } else {
-      console.log('Skipping sync - no auth change or not ready. isLoaded:', isLoaded, 'isAuth:', isAuthenticated, 'prevAuth:', prevAuth)
+      syncLogger.debug('Skipping sync - no auth change or not ready', { 
+        isLoaded, 
+        isAuthenticated, 
+        prevAuth 
+      })
     }
   }, [isAuthenticated, isLoaded])
 
@@ -404,13 +412,17 @@ const useTodos = () => {
         const timeSinceLastCheck = Date.now() - lastSyncCheck
         // Only sync if app was hidden for more than 30 seconds to avoid excessive syncing
         if (timeSinceLastCheck > 30000) {
-          console.log('App became visible after', Math.round(timeSinceLastCheck / 1000), 'seconds - triggering sync')
+          syncLogger.debug('App became visible - triggering sync', { 
+            secondsHidden: Math.round(timeSinceLastCheck / 1000) 
+          })
           const timeoutId = setTimeout(syncOnModeChangeRef.current, 1000)
           // Update last sync check time
           lastSyncCheck = Date.now()
           return () => clearTimeout(timeoutId)
         } else {
-          console.log('App became visible but too soon since last check (', Math.round(timeSinceLastCheck / 1000), 'seconds) - skipping sync')
+          syncLogger.debug('App became visible but too soon since last check - skipping sync', { 
+            secondsSinceCheck: Math.round(timeSinceLastCheck / 1000) 
+          })
         }
         lastSyncCheck = Date.now()
       }

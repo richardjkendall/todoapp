@@ -2,6 +2,7 @@
  * Field-based conflict detection system
  * Only detects conflicts on user-editable fields and provides smart auto-resolution
  */
+import { conflictLogger } from './logger'
 
 /**
  * Deep equality check for complex values
@@ -244,19 +245,27 @@ export function autoResolveConflicts(conflicts, strategy = 'additive') {
  * Merge todos with conflict detection and auto-resolution
  */
 export function smartMergeTodos(localTodos, remoteTodos, autoResolveStrategy = 'additive') {
-  console.log('Smart merge - Local todos:', localTodos.length, 'Remote todos:', remoteTodos.length)
+  conflictLogger.debug('Starting smart merge', { 
+    localCount: localTodos.length, 
+    remoteCount: remoteTodos.length,
+    strategy: autoResolveStrategy
+  })
   
   // Step 1: Detect conflicts
   const { conflicts, safeToMerge } = detectConflicts(localTodos, remoteTodos)
   
-  console.log('Conflicts detected:', conflicts.length)
-  console.log('Safe to merge:', safeToMerge.length)
+  conflictLogger.info('Conflict detection complete', {
+    conflictsFound: conflicts.length,
+    safeToMerge: safeToMerge.length
+  })
   
   // Step 2: Auto-resolve conflicts where possible
   const { resolved, needsUserInput } = autoResolveConflicts(conflicts, autoResolveStrategy)
   
-  console.log('Auto-resolved:', resolved.length)
-  console.log('Need user input:', needsUserInput.length)
+  conflictLogger.info('Auto-resolution complete', {
+    autoResolved: resolved.length,
+    needsUserInput: needsUserInput.length
+  })
   
   // Step 3: Build merged todo list
   const mergedTodos = []

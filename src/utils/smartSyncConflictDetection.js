@@ -144,7 +144,7 @@ function shouldConflict(localTodo, remoteTodo) {
  * @param {Set} localDeletedIds - Set of todo IDs that were deleted locally this session
  */
 export function smartSyncResolve(localTodos, remoteTodos, localDeletedIds = new Set()) {
-  console.log('🧠 Smart sync resolution with tombstones:', {
+  conflictLogger.debug('Smart sync resolution with tombstones', {
     localCount: localTodos.length,
     remoteCount: remoteTodos.length,
     locallyDeleted: localDeletedIds.size,
@@ -155,7 +155,10 @@ export function smartSyncResolve(localTodos, remoteTodos, localDeletedIds = new 
   const activeRemoteTodos = remoteTodos.filter(todo => !todo.deleted)
   const remoteTombstones = remoteTodos.filter(todo => todo.deleted)
   
-  console.log(`📊 Remote breakdown: ${activeRemoteTodos.length} active, ${remoteTombstones.length} tombstones`)
+  conflictLogger.debug('Remote breakdown', { 
+    active: activeRemoteTodos.length, 
+    tombstones: remoteTombstones.length 
+  })
   
   const conflicts = []
   const resolved = []
@@ -166,7 +169,7 @@ export function smartSyncResolve(localTodos, remoteTodos, localDeletedIds = new 
   for (const tombstone of remoteTombstones) {
     const local = localTodos.find(t => t.id === tombstone.id)
     if (local) {
-      console.log(`💀 Todo ${tombstone.id} has remote tombstone - removing from local`)
+      conflictLogger.debug('Todo has remote tombstone - removing from local', { todoId: tombstone.id })
       processedLocalIds.add(tombstone.id)
       // Don't add to resolved (effectively deletes it locally)
     }
@@ -179,16 +182,20 @@ export function smartSyncResolve(localTodos, remoteTodos, localDeletedIds = new 
     if (!local) {
       // Check if this was deleted locally this session
       if (localDeletedIds.has(remote.id)) {
-        console.log(`🗑️ Todo ${remote.id} deleted locally - creating tombstone`)
+        conflictLogger.debug('Todo deleted locally - creating tombstone', { todoId: remote.id })
         tombstonesToCreate.push(createTombstone(remote))
       } else {
         // New remote todo - add it
-        console.log(`📥 New remote todo ${remote.id}: "${remote.text}"`)
+        conflictLogger.debug('New remote todo', { todoId: remote.id, text: remote.text })
         resolved.push(remote)
       }
     } else if (shouldConflict(local, remote)) {
       // True conflict - needs user input
-      console.log(`🔥 Conflict for todo ${remote.id}: "${local.text}" vs "${remote.text}"`)
+      conflictLogger.warn('Conflict for todo', { 
+        todoId: remote.id, 
+        localText: local.text, 
+        remoteText: remote.text 
+      })
       conflicts.push({
         id: remote.id,
         local: local,
@@ -203,7 +210,11 @@ export function smartSyncResolve(localTodos, remoteTodos, localDeletedIds = new 
       const winner = localTime > remoteTime ? local : remote
       const source = localTime > remoteTime ? 'local' : 'remote'
       
-      console.log(`🤖 Auto-resolved todo ${remote.id}: using ${source} version (${winner.text})`)
+      conflictLogger.debug('Auto-resolved todo', { 
+        todoId: remote.id, 
+        source, 
+        text: winner.text 
+      })
       resolved.push({
         ...winner,
         // Ensure we have the latest timestamp
@@ -218,11 +229,11 @@ export function smartSyncResolve(localTodos, remoteTodos, localDeletedIds = new 
     if (!processedLocalIds.has(local.id)) {
       if (localDeletedIds.has(local.id)) {
         // This local todo was deleted this session - create tombstone
-        console.log(`🗑️ Local todo ${local.id} deleted this session - creating tombstone`)
+        conflictLogger.debug('Local todo deleted this session - creating tombstone', { todoId: local.id })
         tombstonesToCreate.push(createTombstone(local))
       } else {
         // Regular local-only todo
-        console.log(`📤 Local-only todo ${local.id}: "${local.text}"`)
+        conflictLogger.debug('Local-only todo', { todoId: local.id, text: local.text })
         resolved.push(local)
       }
     }

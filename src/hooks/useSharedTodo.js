@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { decodeTodoFromShare } from '../utils/todoSharing'
+import { shareLogger } from '../utils/logger'
 
 /**
  * Hook for handling shared todos from URL fragments
@@ -31,7 +32,7 @@ export const useSharedTodo = () => {
         window.history.replaceState(null, '', window.location.pathname + window.location.search)
       }
     } catch (error) {
-      console.error('Error processing shared todo:', error)
+      shareLogger.error('Error processing shared todo', { error: error.message })
     } finally {
       setIsProcessingShare(false)
     }

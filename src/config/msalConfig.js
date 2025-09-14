@@ -1,4 +1,5 @@
 import { PublicClientApplication } from '@azure/msal-browser'
+import { authLogger } from '../utils/logger'
 
 // MSAL configuration
 export const msalConfig = {
@@ -34,9 +35,9 @@ export const initializeMsal = async () => {
     // Handle redirect promise if returning from redirect
     const response = await msalInstance.handleRedirectPromise()
     if (response) {
-      console.log('Authentication successful:', response)
+      authLogger.info('Authentication successful', { response })
     }
   } catch (error) {
-    console.error('MSAL initialization error:', error)
+    authLogger.error('MSAL initialization error', { error: error.message })
   }
 }

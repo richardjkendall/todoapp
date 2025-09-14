@@ -1,5 +1,6 @@
 import { useSyncManager } from './useSyncManager'
 import { useStorageManager } from './useStorageManager'
+import { syncLogger } from '../utils/logger'
 
 /**
  * Enhanced OneDrive storage hook - simplified by using focused sub-hooks
@@ -15,7 +16,7 @@ export const useEnhancedOneDriveStorage = () => {
     
     // Check if data actually changed since last save
     if (!syncManager.hasDataChanged || !syncManager.hasDataChanged(todos)) {
-      console.log('No changes detected, skipping sync')
+      syncLogger.debug('No changes detected, skipping sync')
       return
     }
     

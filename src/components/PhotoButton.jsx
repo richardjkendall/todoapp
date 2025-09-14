@@ -9,6 +9,7 @@ import CameraCapture from './CameraCapture'
 import { usePhotoService } from '../hooks/usePhotoService'
 import { useToastContext } from '../context/ToastContext'
 import { isMobileDevice, hasCameraSupport, testCameraAccess } from '../utils/deviceUtils'
+import { appLogger } from '../utils/logger'
 import { CameraIcon } from './Icons'
 import { Button } from '../styles/TodoStyles'
 
@@ -57,7 +58,7 @@ const PhotoButton = ({ onPhotoAdded, disabled = false, onShowCamera }) => {
     setIsUploading(true)
 
     try {
-      console.log('Starting photo upload...', { 
+      appLogger.debug('Starting photo upload from photo button', { 
         size: photoBlob.size,
         type: photoBlob.type 
       })
@@ -73,7 +74,7 @@ const PhotoButton = ({ onPhotoAdded, disabled = false, onShowCamera }) => {
       // Upload photo to OneDrive
       const result = await photoService.uploadPhoto(photoBlob, 'Todo Photo')
       
-      console.log('Photo upload successful:', result)
+      appLogger.info('Photo upload successful', { filename: result.filename })
       
       // Pass markdown reference to parent
       onPhotoAdded(result.markdown)
@@ -81,7 +82,7 @@ const PhotoButton = ({ onPhotoAdded, disabled = false, onShowCamera }) => {
       showSuccess('Photo added successfully!')
       
     } catch (error) {
-      console.error('Photo upload failed:', error)
+      appLogger.error('Photo upload failed from photo button', { error: error.message })
       showError(`Failed to upload photo: ${error.message}`)
     } finally {
       setIsUploading(false)

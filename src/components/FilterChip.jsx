@@ -21,6 +21,12 @@ const ChipButton = styled.button`
   white-space: nowrap;
   flex-shrink: 0;
   
+  /* Add class name for better selector targeting */
+  &.filter-chip {
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+  
   @media (min-width: 769px) {
     gap: ${props => props.theme.spacing.sm};
     padding: ${props => props.theme.spacing.sm} ${props => props.theme.spacing.md};
@@ -85,6 +91,7 @@ const FilterChip = ({
 }) => {
   return (
     <ChipButton
+      className="filter-chip"
       active={active}
       onClick={onClick}
       disabled={disabled}

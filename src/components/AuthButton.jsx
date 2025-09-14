@@ -2,6 +2,7 @@ import { useState } from 'react'
 import styled from 'styled-components'
 import { useAuth } from '../context/AuthContext'
 import UserAvatar from './UserAvatar'
+import { authLogger } from '../utils/logger'
 
 const AuthButtonContainer = styled.div`
   display: flex;
@@ -63,7 +64,7 @@ const AuthButtonComponent = () => {
       setActionLoading(true)
       await login()
     } catch (error) {
-      console.error('Login failed:', error)
+      authLogger.error('Login failed', { error: error.message })
     } finally {
       setActionLoading(false)
     }
@@ -74,7 +75,7 @@ const AuthButtonComponent = () => {
       setActionLoading(true)
       await logout()
     } catch (error) {
-      console.error('Logout failed:', error)
+      authLogger.error('Logout failed', { error: error.message })
     } finally {
       setActionLoading(false)
     }

@@ -7,6 +7,7 @@ import ShareModal from './ShareModal'
 import { shouldUseNativeShare } from '../utils/deviceDetection'
 import { shareToDoNatively } from '../utils/nativeShare'
 import { useAuth } from '../context/AuthContext'
+import { shareLogger } from '../utils/logger'
 
 const ShareButtonStyled = styled(BaseIconButton)`
   &:disabled {
@@ -84,7 +85,7 @@ const ShareButton = ({ todo, className }) => {
         
       } catch (shareError) {
         // Native share failed, fall back to modal
-        console.warn('Native share failed, showing modal:', shareError.message)
+        shareLogger.warn('Native share failed, showing modal', { error: shareError.message })
         setError(`Native share failed: ${shareError.message}`)
         setTimeout(() => setError(''), 3000)
         setShowModal(true)

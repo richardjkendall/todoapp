@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef } from 'react'
+import { syncLogger } from '../utils/logger'
 
 export const useSyncQueue = () => {
   const [pendingOperations, setPendingOperations] = useState([])
@@ -45,7 +46,11 @@ export const useSyncQueue = () => {
           await handler(operation)
           processedCount++
         } catch (error) {
-          console.error(`Failed to process operation ${operation.id}:`, error)
+          syncLogger.error('Failed to process queued operation', { 
+            operationId: operation.id, 
+            operationType: operation.type,
+            error: error.message 
+          })
           failedOperations.push(operation)
         }
       }
