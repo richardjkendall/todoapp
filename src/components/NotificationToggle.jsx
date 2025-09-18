@@ -76,25 +76,45 @@ const StatusDot = styled.div`
 const NotificationToggle = ({ onToggle, isVisible, isCompact }) => {
   const [notificationStatus, setNotificationStatus] = useState('unknown')
 
-  useEffect(() => {
-    const updateStatus = () => {
-      const settings = getNotificationSettings()
-      const canShow = canShowNotifications()
-      
-      if (settings.permissions === 'denied') {
-        setNotificationStatus('blocked')
-      } else if (canShow && settings.enabled) {
-        setNotificationStatus('enabled')
-      } else if (settings.permissions === 'granted' && !settings.enabled) {
-        setNotificationStatus('disabled')
-      } else {
-        setNotificationStatus('pending')
-      }
+  const updateStatus = () => {
+    const settings = getNotificationSettings()
+    const canShow = canShowNotifications()
+    
+    if (settings.permissions === 'denied') {
+      setNotificationStatus('blocked')
+    } else if (canShow && settings.enabled) {
+      setNotificationStatus('enabled')
+    } else if (settings.permissions === 'granted' && !settings.enabled) {
+      setNotificationStatus('disabled')
+    } else {
+      setNotificationStatus('pending')
     }
+  }
 
+  // Update status on initial load and after a short delay to handle race conditions
+  useEffect(() => {
     updateStatus()
     
-    // Update status when visibility changes (user might have changed settings)
+    // Also check after a short delay in case permissions API is async
+    const timeoutId = setTimeout(updateStatus, 100)
+    
+    // Update status when user returns to the tab
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        updateStatus()
+      }
+    }
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    
+    return () => {
+      clearTimeout(timeoutId)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+  }, [])
+
+  // Poll for status updates when modal is visible
+  useEffect(() => {
     if (isVisible) {
       const interval = setInterval(updateStatus, 1000)
       return () => clearInterval(interval)
