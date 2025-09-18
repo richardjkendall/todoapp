@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { ThemeProvider as StyledThemeProvider } from 'styled-components'
 import TodoForm from './components/TodoForm'
 import TodoList from './components/TodoList'
@@ -22,6 +22,7 @@ import NotificationSettingsModal from './components/NotificationSettingsModal'
 import NotificationToggle from './components/NotificationToggle'
 import CameraCapture from './components/CameraCapture'
 import { useSharedTodo } from './hooks/useSharedTodo'
+import { useQuickFilters } from './hooks/useQuickFilters'
 import { appLogger } from './utils/logger'
 import { 
   GlobalStyle, 
@@ -92,9 +93,7 @@ const AppContent = () => {
   const { isAuthenticated, isLoading: isAuthLoading } = useAuth()
   const theme = getTheme(isDark)
   const [headerIsSticky, setHeaderIsSticky] = useState(false)
-  const [quickFilteredTodos, setQuickFilteredTodos] = useState(null)
-  const [activeQuickFilters, setActiveQuickFilters] = useState(null)
-  const [filterStats, setFilterStats] = useState(null)
+  const [activeQuickFilters, setActiveQuickFilters] = useState(new Set())
   const [showNotificationSettings, setShowNotificationSettings] = useState(false)
   const [showCameraCapture, setShowCameraCapture] = useState(false)
   const [onPhotoCapture, setOnPhotoCapture] = useState(null)
@@ -127,6 +126,79 @@ const AppContent = () => {
     isLoaded
   } = useTodos()
 
+  // Get quick filter functions  
+  const { quickFilterOptions, filterTodosByAge, filterTodosByPriorityGroup } = useQuickFilters(allTodos)
+  
+  // Apply filters to get filtered todos
+  const filteredTodos = useMemo(() => {
+    if (activeQuickFilters.size === 0) {
+      return allTodos
+    }
+    
+    let result = allTodos
+    const activeOptions = quickFilterOptions.filter(opt => activeQuickFilters.has(opt.id))
+    
+    activeOptions.forEach(filterOption => {
+      if (filterOption.type === 'tag') {
+        const tag = filterOption.label.substring(1) // Remove #
+        result = result.filter(todo => 
+          todo.tags && todo.tags.some(t => t.toLowerCase() === tag.toLowerCase())
+        )
+      } else if (filterOption.type === 'age') {
+        const ageType = filterOption.id === 'old-items' ? 'old' : 'very-old'
+        result = filterTodosByAge(result, ageType)
+      } else if (filterOption.type === 'priority') {
+        const priorityGroup = filterOption.id === 'high-priority' ? 'high' : 'low'
+        result = filterTodosByPriorityGroup(result, priorityGroup)
+      } else if (filterOption.type === 'status') {
+        const completed = filterOption.id === 'completed'
+        result = result.filter(todo => todo.completed === completed)
+      }
+    })
+    
+    return result
+  }, [allTodos, activeQuickFilters, quickFilterOptions, filterTodosByAge, filterTodosByPriorityGroup])
+  
+  // Compute filter stats without storing in state
+  const filterStats = useMemo(() => {
+    if (activeQuickFilters.size > 0) {
+      return {
+        filteredCount: filteredTodos.length,
+        totalCount: allTodos.length
+      }
+    }
+    return null
+  }, [activeQuickFilters.size, filteredTodos.length, allTodos.length])
+  
+  // Load saved filters on mount
+  useEffect(() => {
+    try {
+      const savedFilters = localStorage.getItem('quickFilters')
+      if (savedFilters) {
+        const filterArray = JSON.parse(savedFilters)
+        if (Array.isArray(filterArray)) {
+          setActiveQuickFilters(new Set(filterArray))
+        }
+      }
+    } catch (error) {
+      appLogger.warn('Failed to restore quick filters from storage', { error: error.message })
+    }
+  }, [])
+  
+  // Save filters when they change
+  useEffect(() => {
+    try {
+      const filterArray = Array.from(activeQuickFilters)
+      if (filterArray.length > 0) {
+        localStorage.setItem('quickFilters', JSON.stringify(filterArray))
+      } else {
+        localStorage.removeItem('quickFilters')
+      }
+    } catch (error) {
+      appLogger.warn('Failed to save quick filters to storage', { error: error.message })
+    }
+  }, [activeQuickFilters])
+
   // Handle shared todo actions
   const handleAcceptSharedTodo = () => {
     const todo = acceptSharedTodo()
@@ -142,19 +214,25 @@ const AppContent = () => {
     clearSharedTodo()
   }
 
-  // Handle quick filter changes
-  const handleQuickFilterChange = (filteredTodos, activeFilters, stats) => {
-    setQuickFilteredTodos(filteredTodos)
-    setActiveQuickFilters(activeFilters)
-    setFilterStats(stats)
-  }
+  // Handle individual filter toggle
+  const handleFilterToggle = useCallback((filterId) => {
+    setActiveQuickFilters(current => {
+      const newActiveFilters = new Set(current)
+      if (newActiveFilters.has(filterId)) {
+        newActiveFilters.delete(filterId)
+        return newActiveFilters
+      } else {
+        newActiveFilters.add(filterId)
+        return newActiveFilters
+      }
+    })
+  }, [])
+
 
   // Clear quick filters when regular search becomes active
   const handleSearch = (query) => {
-    if (query && (quickFilteredTodos || activeQuickFilters)) {
-      setQuickFilteredTodos(null)
-      setActiveQuickFilters(null)
-      setFilterStats(null)
+    if (query && activeQuickFilters.size > 0) {
+      setActiveQuickFilters(new Set())
       // Also clear persisted quick filters when search starts
       localStorage.removeItem('quickFilters')
     }
@@ -201,9 +279,7 @@ const AppContent = () => {
     }
     
     // Clear quick filters and set new one based on notification
-    setQuickFilteredTodos(null)
-    setActiveQuickFilters(null)
-    setFilterStats(null)
+    setActiveQuickFilters(new Set())
     
     // Trigger appropriate filter based on notification action
     const filterMap = {
@@ -215,15 +291,14 @@ const AppContent = () => {
     appLogger.debug('Mapped filter params to filter name', { filterParams, filterName })
     
     if (filterName) {
-      // Simulate clicking the appropriate quick filter
-      appLogger.debug('Dispatching quick-filter-select event')
-      setTimeout(() => {
-        const filterEvent = new CustomEvent('quick-filter-select', {
-          detail: { filterName, filterParams }
-        })
-        window.dispatchEvent(filterEvent)
-        appLogger.debug('quick-filter-select event dispatched', { filterName, filterParams })
-      }, 100)
+      // Find the filter ID and apply it directly
+      const matchingOption = quickFilterOptions.find(opt => 
+        opt.label.toLowerCase().includes(filterName.toLowerCase())
+      )
+      if (matchingOption) {
+        setActiveQuickFilters(new Set([matchingOption.id]))
+        appLogger.debug('Applied notification filter', { filterId: matchingOption.id, filterName })
+      }
     } else {
       appLogger.warn('No matching filter found for params', { filterParams })
     }
@@ -232,7 +307,7 @@ const AppContent = () => {
   // Determine which todos to display
   const displayTodos = searchActive 
     ? todos  // Regular search takes precedence
-    : (quickFilteredTodos || todos)  // Use quick filtered todos if available, otherwise all todos
+    : (activeQuickFilters.size > 0 ? filteredTodos : todos)  // Use filtered todos if filters active, otherwise all todos
 
   // Listen for notification filter requests and service worker messages
   useEffect(() => {
@@ -351,7 +426,8 @@ const AppContent = () => {
         {/* Quick Filters - show when not in search mode */}
         <QuickFilters
           todos={allTodos}
-          onFilterChange={handleQuickFilterChange}
+          activeFilters={activeQuickFilters}
+          onFilterToggle={handleFilterToggle}
           searchActive={searchActive}
           filterStats={filterStats}
         />
@@ -380,7 +456,7 @@ const AppContent = () => {
               disabled={syncStatus === 'syncing'}
               reconstructTextWithTags={reconstructTextWithTags}
               formatTimestamp={formatTimestamp}
-              searchActive={searchActive || Boolean(quickFilteredTodos)}
+              searchActive={searchActive || activeQuickFilters.size > 0}
             />
           )}
         </ContentArea>

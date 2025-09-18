@@ -89,6 +89,8 @@ const FilterChip = ({
   disabled = false,
   'data-testid': testId
 }) => {
+  const isOrphaned = count === 0 && active
+  
   return (
     <ChipButton
       className="filter-chip"
@@ -98,11 +100,17 @@ const FilterChip = ({
       data-testid={testId}
       aria-pressed={active}
       role="button"
+      style={isOrphaned ? { opacity: 0.8, fontStyle: 'italic' } : {}}
+      title={isOrphaned ? 'No items match this filter (click to remove)' : undefined}
     >
       {label}
-      {count > 0 && (
+      {count > 0 ? (
         <ChipCount active={active}>
           {count}
+        </ChipCount>
+      ) : active && (
+        <ChipCount active={active}>
+          ✕
         </ChipCount>
       )}
     </ChipButton>
